@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+xr_output.json
+climate_pulse_output.json
