@@ -38,16 +38,20 @@ def main():
     print(f"  RR range : {profile.rr_min:.0f} - {profile.rr_max:.0f} days")
     print()
 
-    # --- fit: pick k by silhouette score, then cluster the years ---
+    # --- fit: silhouette shown for context, but k is forced by domain choice ---
+    # (silhouette's argmax kept flipping between runs as features changed, and
+    # even its "best" k diluted genuine outliers into broad buckets — see
+    # conversation. Issue 3 names four archetypes: calm, disturbance, shock,
+    # recovery — using that instead of chasing a noisy metric.)
     scores = suggest_k(profile)
-    best_k = max(scores, key=scores.get)
-    print("SILHOUETTE SCORES BY k")
+    forced_k = 4
+    print("SILHOUETTE SCORES BY k (context only — k is forced below)")
     for k, s in scores.items():
-        flag = "  <- best" if k == best_k else ""
+        flag = "  <- forced choice" if k == forced_k else ""
         print(f"  k={k}: {s:.3f}{flag}")
     print()
 
-    model = fit_clusters(profile, k=best_k)
+    model = fit_clusters(profile, k=forced_k)
     members = cluster_members(model)
     moods = propose_moods(model, profile)
 
@@ -59,7 +63,8 @@ def main():
         flagged = [f"{y} ({KNOWN_YEARS[y]})" for y in years if y in KNOWN_YEARS]
         print(f"  cluster {c}  n={len(years)}  proposed valence={v:+.2f} arousal={a:.2f}")
         print(f"    centroid: R={centroid['r_value']:.0f}mm  dev={centroid['deviation_from_norm']:+.2f}  "
-              f"stdev={centroid['stdev']:.1f}  return_period={centroid['return_period']:.1f}y")
+              f"stdev={centroid['stdev']:.1f}  concentration={centroid['peak_concentration']:.2f}  "
+              f"log_return_period={centroid['log_return_period']:.1f}")
         if flagged:
             print(f"    known years here: {', '.join(flagged)}")
     print()
@@ -78,6 +83,7 @@ def main():
             continue
         d = next(p for p in params if p.timestamp == yp.r_date).as_dict()
         print(f"{year} — {label}  (cluster {model.labels[year]})")
+        print(f"   return_period: empirical={yp.return_period:.1f}y  fitted={yp.return_period_fitted:.1f}y")
         print(f"   diameter {d['diameter']:.2f}  arousal {d['arousal']:.2f}  "
               f"rhythm {d['pulse_rhythm']:.2f}  valence {d['valence']:+.2f}")
 

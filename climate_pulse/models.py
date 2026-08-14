@@ -29,7 +29,11 @@ class YearlyPulse:
     stdev: float                    # day-to-day variability this year
     wet_day_frequency: float        # fraction of days with measurable rain
     deviation_from_norm: float      # vs. trailing 30yr mean; 0.0 = normal
-    return_period: float            # recurrence interval of this year's R, in years
+    return_period: float            # empirical (Weibull) recurrence interval, in years
+                                     # — bounded by sample size, can't exceed ~N years
+    return_period_fitted: float     # Gumbel-fitted recurrence interval, in years
+                                     # — extrapolates past the sample, matches how
+                                     # agencies report "1-in-N-year" events
     annual_total: float             # total rainfall this year, mm
 
 

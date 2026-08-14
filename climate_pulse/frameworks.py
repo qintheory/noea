@@ -20,6 +20,8 @@ from collections import defaultdict
 from datetime import date
 import statistics
 
+from scipy.stats import gumbel_r
+
 from noea.models import TimeSeries
 from .models import YearlyPulse, DiagnosticProfile
 
@@ -98,10 +100,35 @@ def deviation_from_norm(features: dict[int, dict], window: int = NORM_WINDOW_YEA
 
 
 def return_periods(extremes: dict[int, tuple[float, date]]) -> dict[int, float]:
-    """Weibull plotting-position return period (years) for each year's R value."""
+    """Weibull plotting-position return period (years) for each year's R value.
+
+    Empirical and simple, but structurally capped at ~N years (N = sample
+    size) — the most extreme year on record can never score higher than
+    that, no matter how extreme it actually was. See return_periods_fitted
+    for the version that can exceed the sample.
+    """
     n = len(extremes)
     ranked = sorted(extremes.items(), key=lambda kv: kv[1][0], reverse=True)
     return {y: (n + 1) / rank for rank, (y, _) in enumerate(ranked, start=1)}
+
+
+def return_periods_fitted(extremes: dict[int, tuple[float, date]]) -> dict[int, float]:
+    """Gumbel-fitted return period (years) for each year's R value.
+
+    Fits a Gumbel (Extreme Value Type I) distribution to the full annual-
+    maxima series — the standard method for this exact kind of data in
+    hydrological frequency analysis — then reads each year's return period
+    off the fitted survival function. Unlike the empirical version, this
+    can extrapolate past the sample size, which is how official reporting
+    arrives at figures like "1-in-500-years" from a ~135-year record.
+    """
+    r_vals = [r for r, _ in extremes.values()]
+    loc, scale = gumbel_r.fit(r_vals)
+    out = {}
+    for y, (r, _) in extremes.items():
+        exceedance_prob = gumbel_r.sf(r, loc=loc, scale=scale)  # P(R' >= r)
+        out[y] = min(1.0 / exceedance_prob, 1e5) if exceedance_prob > 0 else 1e5
+    return out
 
 
 def build_profile(ts: TimeSeries) -> DiagnosticProfile:
@@ -113,6 +140,7 @@ def build_profile(ts: TimeSeries) -> DiagnosticProfile:
     feat = annual_features(ts)
     dev = deviation_from_norm(feat)
     rp = return_periods(extremes)
+    rp_fit = return_periods_fitted(extremes)
 
     years = []
     for y in sorted(extremes):
@@ -128,6 +156,7 @@ def build_profile(ts: TimeSeries) -> DiagnosticProfile:
             wet_day_frequency=feat[y]["wet_day_frequency"],
             deviation_from_norm=dev[y],
             return_period=rp[y],
+            return_period_fitted=rp_fit[y],
             annual_total=feat[y]["annual_total"],
         ))
 

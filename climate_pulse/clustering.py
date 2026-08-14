@@ -15,6 +15,11 @@ driven only by annual deviation) missed 2023: a storm year can look
 ordinary on annual totals while being extreme on R, return period, and
 day-to-day variability. Clustering on all six features together catches
 that a single axis can't.
+
+Uses the fitted (not empirical) return period, log-transformed: fitted
+return periods for genuine outliers can run into the thousands of years
+while ordinary years sit near 1, and that skew would otherwise let a
+single extreme year dominate the distance metric on its own.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -28,7 +33,7 @@ from .models import DiagnosticProfile, YearlyPulse
 
 FEATURE_NAMES = [
     "r_value", "stdev", "wet_day_frequency",
-    "deviation_from_norm", "return_period", "peak_concentration",
+    "deviation_from_norm", "log_return_period", "peak_concentration",
 ]
 
 
@@ -48,7 +53,8 @@ def _feature_matrix(years: list[YearlyPulse]) -> np.ndarray:
     for yp in years:
         rows.append([
             yp.r_value, yp.stdev, yp.wet_day_frequency,
-            yp.deviation_from_norm, yp.return_period, _peak_concentration(yp),
+            yp.deviation_from_norm, np.log1p(yp.return_period_fitted),
+            _peak_concentration(yp),
         ])
     return np.array(rows)
 
@@ -112,11 +118,11 @@ def propose_moods(
     """
     r_vals = [yp.r_value for yp in profile.years]
     stdev_vals = [yp.stdev for yp in profile.years]
-    rp_vals = [yp.return_period for yp in profile.years]
+    log_rp_vals = [np.log1p(yp.return_period_fitted) for yp in profile.years]
     pc_vals = [_peak_concentration(yp) for yp in profile.years]
     r_lo, r_hi = min(r_vals), max(r_vals)
     sd_lo, sd_hi = min(stdev_vals), max(stdev_vals)
-    rp_lo, rp_hi = min(rp_vals), max(rp_vals)
+    rp_lo, rp_hi = min(log_rp_vals), max(log_rp_vals)
     pc_lo, pc_hi = min(pc_vals), max(pc_vals)
 
     def norm(v, lo, hi):
@@ -126,7 +132,7 @@ def propose_moods(
     for c, centroid in model.centroids_raw.items():
         magnitude = norm(centroid["r_value"], r_lo, r_hi)
         variability = norm(centroid["stdev"], sd_lo, sd_hi)
-        rarity = norm(centroid["return_period"], rp_lo, rp_hi)
+        rarity = norm(centroid["log_return_period"], rp_lo, rp_hi)
         concentration = norm(centroid["peak_concentration"], pc_lo, pc_hi)
         extremity = (magnitude + variability + rarity + concentration) / 4.0
 
