@@ -97,18 +97,49 @@ four Rhine mainstem (Lustenau, Basel, Köln, Lobith — GRDC) and four alpine
 headwaters (Weisse Lütschine, Reuss-Andermatt, Aare-Brienzwiler, Aare-Thun
 — FOEN). `frameworks.py` computes the same four diagnostics as rainfall's
 (pulse = hydrograph, personality = flow-duration curve, memory = recession
-curve, breath = seasonal cycle), and its results — computed with code
-originally tuned only against synthetic data — match Issue 6's own
-narrative description of these rivers (downstream buffering in fdc_slope
-and recession_k, Weisse Lütschine's flashy melt-driven fdc_slope), a real
-validation the design held up on data it had never seen.
+curve, breath = seasonal cycle).
+
+Validated against every named event in Issue 6, not just assumed correct:
+- **1976 drought** and **1995 flood** — `mapping.py` originally read the
+  real Jan 1995 flood (98% of Köln's all-time-max discharge) as valence
+  +0.60, the *maximum possible positive* value, because "above the
+  seasonal normal" was scored as mild abundance regardless of how extreme.
+  Fixed with an all-time-extremity term (same class of fix already applied
+  to rainfall's valence for 2023). Now reads -0.57.
+- **1999–2002 "sustained fullness"** — confirmed: all four stations,
+  every year, 107–139% of their own all-time mean.
+- **Post-2010 "long-term drying"** — real but more nuanced than Issue 6's
+  text implies. 1980s→2010s: every station declined (Lustenau -5%, Basel
+  -9%, Köln -18%, Lobith -19%, stronger downstream). But three of four
+  stations' data ends in 2020, and Köln — the only one with real 2020–2024
+  coverage — shows a partial *rebound* (+3.5% vs. the 2010s), not
+  continued decline. The multi-decade trend is real; "still worsening
+  right now" isn't confirmed by what we can actually check.
+
+**Known limitation, honestly**: `DiagnosticProfile` (river) has no
+rolling/trend-aware baseline — `monthly_means`, `q50`, `min_flow`/`max_flow`
+are computed once over the *entire* record, unlike rainfall's trailing
+30-year `deviation_from_norm`. So even though the data confirms a real
+multi-decade decline, `mapping.py` currently can't score "this decade
+feels drier than the historical norm" at all — only a single day against
+the whole-record fingerprint. Undecided whether this is worth building.
+
+No station's data reaches 2025 or 2026 (three end Dec 2020, Köln ends Dec
+2024) — any claim about current conditions needs a data update to check.
 
 **Not yet built**: Issue 6's multi-station "ribbon" / XR-body composite —
 combining all eight stations into one continuous, position-aware form —
 is a separate, bigger design step beyond the current one-profile-per-
-station diagnostic layer.
+station diagnostic layer, and is on hold pending the output contract
+question below.
 
 ## The output contract
+
+**Status: unconfirmed.** This shape was already present in the repo's
+first commit, before any of the module work documented here — it has not
+been separately confirmed with the XR/technical side (Dan). Everything in
+both `mapping.py` modules is built against it, so treat it as provisional
+scaffolding, not a settled spec, until that confirmation happens.
 
 Every module ultimately produces the same `XRParameters` shape:
 
