@@ -1,7 +1,7 @@
 """
 Noéa river pipeline — end-to-end demo, real GRDC/FOEN discharge data.
 
-Run:  python3 demo_river.py
+Run:  python3 demo_climate_pulse_river.py
 
 Loads all eight real stations Issue 6 names (four Rhine mainstem: Lustenau,
 Basel, Koeln, Lobith; four alpine headwaters: Weisse Luetschine, Reuss,
@@ -16,9 +16,9 @@ pipeline itself changed, only the data feeding it.
 """
 import json
 
-from noea.frameworks import build_profile
-from noea.loaders import load_alpine_stations, load_rhine_stations
-from noea.mapping import map_series
+from noea.climate_pulse.river import (
+    build_profile, load_alpine_stations, load_rhine_stations, map_series,
+)
 
 
 def print_comparison(label, stations):

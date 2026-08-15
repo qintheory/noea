@@ -1,7 +1,7 @@
 """
 Climate Pulse — end-to-end demo, real HKO data.
 
-Run:  python3 demo_climate_pulse.py
+Run:  python3 demo_climate_pulse_rainfall.py
 
 Loads Hong Kong's daily rainfall record (HKO, 1884-2025), builds the
 climate diagnostic profile (R/RR/S/deviation/return-period/peak-
@@ -14,8 +14,8 @@ approach was dropped).
 """
 import json
 
-from climate_pulse import build_profile, load_rainfall, map_series
-from climate_pulse.mapping import _shock
+from noea.climate_pulse.rainfall import build_profile, load_rainfall, map_series
+from noea.climate_pulse.rainfall.mapping import _shock
 
 KNOWN_YEARS = {
     1926: "single overwhelming pulse (Issue 4)",

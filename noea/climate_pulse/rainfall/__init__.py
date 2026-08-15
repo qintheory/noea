@@ -1,8 +1,8 @@
 """
-Climate Pulse — Hong Kong rainfall's climatic heartbeat.
+Climate Pulse: rainfall — Hong Kong rainfall's climatic heartbeat.
 
 Public API:
-    from climate_pulse import load_rainfall, build_profile, map_series
+    from noea.climate_pulse.rainfall import load_rainfall, build_profile, map_series
 """
 from .loaders import load_rainfall
 from .frameworks import build_profile
