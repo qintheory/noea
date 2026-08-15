@@ -12,8 +12,7 @@ see the parameters respond.
 import json
 from datetime import date
 
-from noea import build_profile, map_series
-from noea.synthetic import make_leman_like
+from noea.climate_pulse.river import build_profile, make_leman_like, map_series
 
 
 def main():
