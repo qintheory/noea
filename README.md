@@ -17,15 +17,25 @@ This repository implements two of Noéa's prototypes described there:
   precipitation records as a climatic rhythm, per Noéa Issue 3 "Hong Kong
   Heartbeat" (March 2025) and Issue 4 "Affective Climate" (June 2025) —
   both published at the link above.
-- **Human-Water Interface** (Prototype II) — real-time river/lake signals
-  (flow, temperature) for sonification and physical installation (fountain),
-  per Issue 6. Currently a prototype against synthetic data; real-data
-  integration is next.
+- **Climate Pulse: river** — the same four-diagnostic methodology
+  (pulse/breath/personality/memory) applied to river discharge instead of
+  rainfall, per Issue 6 "River Anatomy" (April 2026), which uses the Rhine
+  (GRDC discharge data) as its case study. Currently a prototype against
+  synthetic data; real Rhine data integration is next.
 
-Both are independent implementations of the same shared contract — see
-below — so a downstream consumer (XR engine, sonification patch, fountain
-controller) can read either one's output without knowing which module, or
-which science, produced it.
+Note on naming: this repository's `noea/` module was originally labelled
+"Human-Water Interface" in earlier scaffolding, before Issue 6 clarified
+the terminology. **Human-Water Interface (Prototype II)** is, per Issue 6,
+a genuinely different thing — proximate real-time sensing (pH, oxygen,
+flow, sound) at specific rivers (L'Aire, Vardar, Green Qinba), translated
+into physical/XR presence rather than a load → diagnose → map pipeline.
+It isn't implemented in this repository yet; Issue 6 itself notes its data
+pipelines are still in development.
+
+Both Climate Pulse modules are independent implementations of the same
+shared contract — see below — so a downstream consumer (XR engine,
+sonification patch, fountain controller) can read either one's output
+without knowing which module, or which science, produced it.
 
 ## The shared contract: load → diagnose → map
 
@@ -77,7 +87,7 @@ still diverge from press-reported figures like "1-in-500-years" — likely a
 rolling-24h vs. calendar-day data definition difference rather than a
 modeling error.
 
-## noea/ — River (Human-Water Interface prototype)
+## noea/ — Climate Pulse: river (Rhine discharge)
 
 ```bash
 python3 demo.py
@@ -88,8 +98,9 @@ fingerprint (mean/max/min flow, flow-duration curve, recession constant,
 seasonal means), maps every day to XR parameters, writes `xr_output.json`.
 No dependencies required — pure standard library.
 
-**Next**: a real loader for CIPEL / OCEau / hydrodata CSVs (`noea/loaders.py`,
-not yet written) — the rest of the pipeline doesn't change.
+**Next**: a real loader for Rhine GRDC discharge data (`noea/loaders.py`,
+not yet written) — four stations (Lustenau, Basel, Köln, Lobith), per
+Issue 6. The rest of the pipeline doesn't change.
 
 ## The output contract
 
@@ -130,5 +141,5 @@ separation is the whole point, and it holds independently in both modules.
 - Meeting of Waters — Noéa project: https://www.meetingofwaters.org/noea
 - Noéa Issue 3, "Hong Kong Heartbeat" (March 2025)
 - Noéa Issue 4, "Affective Climate" (June 2025)
-- Noéa Issue 6 (river / Human-Water Interface prototype)
+- Noéa Issue 6, "River Anatomy" (April 2026)
 - Rainfall data: Hong Kong Observatory (HKO)
