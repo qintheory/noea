@@ -11,16 +11,31 @@ For each timestep we produce one XRParameters object:
     discharge (vs the station's own range)   -> diameter, arousal
     seasonal position (this month vs the year)-> pulse_rhythm
     temperature anomaly (if available)        -> luminosity
-    low-flow proximity (near Q90?)            -> valence (drought = negative)
+    seasonal ratio + all-time extremity        -> valence (drought AND flood
+                                                  both read negative)
 
 Everything is normalised against the station's OWN profile, so a small alpine
 stream and a great lake are each expressed on their own terms.
+
+valence fix, dated: checked against real Rhine data (Issue 6's own named
+events), the original seasonal-ratio-only formula let a near-record flood
+(Koeln, Jan 1995, 98% of its all-time-max discharge) cap out at +0.6 --
+maximally calm -- because "above the seasonal normal" was read as mild
+abundance no matter how extreme. The extremity term below fixes that:
+regardless of season, a day near the station's own all-time flood or
+drought extreme now pulls valence toward crisis, the same fix already
+applied to climate_pulse/rainfall's valence for the same underlying flaw
+(2023's storm reading calm because deviation-from-norm alone can't see a
+single extreme event).
 """
 
 from __future__ import annotations
 from datetime import date
 
 from .models import TimeSeries, DiagnosticProfile, XRParameters
+
+# how much all-time extremity (regardless of season) can additionally pull valence down
+SHOCK_VALENCE_WEIGHT = 1.2
 
 
 def _norm(value: float, lo: float, hi: float) -> float:
@@ -29,6 +44,20 @@ def _norm(value: float, lo: float, hi: float) -> float:
         return 0.5
     t = (value - lo) / (hi - lo)
     return max(0.0, min(1.0, t))
+
+
+def _extremity(profile: DiagnosticProfile, discharge: float) -> float:
+    """How far today's discharge sits from the station's own median, 0..1,
+    scaled by the largest such distance on record (whichever side is
+    further — flood or drought). 0 near the middle, 1 at an all-time extreme.
+
+    Deliberately independent of season: a record flood is a crisis whether
+    or not it happens to fall in the month that's usually wettest.
+    """
+    span = max(profile.max_flow - profile.q50, profile.q50 - profile.min_flow)
+    if span <= 0:
+        return 0.0
+    return max(0.0, min(1.0, abs(discharge - profile.q50) / span))
 
 
 def map_timestep(
@@ -59,23 +88,29 @@ def map_timestep(
     season = _norm(m_val, yr_lo, yr_hi)          # 0 in low season, 1 in high
     p.pulse_rhythm = round(0.4 + season * 1.2, 4)
 
-    # --- valence: how does today compare to what THIS SEASON expects? ---
-    # A summer at half its usual flow is a drought and reads negative, even
-    # if the absolute number sits above the all-time Q90. Winter low water is
-    # normal and stays neutral. This seasonal-relative reading is what makes
-    # drought *felt* rather than merely measured.
+    # --- valence: seasonal comparison sets the sign, all-time extremity ---
+    # pulls it further down on top of that, regardless of sign. A summer at
+    # half its usual flow is a drought and reads negative even if the
+    # absolute number sits above the all-time Q90 — that's the seasonal
+    # part, unchanged. But a day far outside the station's own historical
+    # range now reads as crisis no matter how "normal for the season" it
+    # technically is, which is what catches a flood the seasonal ratio
+    # alone would read as mere abundance (see module docstring).
     expected = profile.monthly_means[month - 1]   # normal flow for this month
     if expected > 0:
         ratio = discharge / expected              # 1.0 = a normal day
         if ratio < 1.0:
             # below seasonal normal -> negative valence, steeper the drier.
             # ratio 1.0 -> 0 ; ratio 0.4 -> about -1 (severe drought)
-            p.valence = round(max(-1.0, (ratio - 1.0) / 0.6), 4)
+            base = max(-1.0, (ratio - 1.0) / 0.6)
         else:
             # above seasonal normal -> mild positive (abundance), capped.
-            p.valence = round(min(0.6, (ratio - 1.0) * 0.8), 4)
+            base = min(0.6, (ratio - 1.0) * 0.8)
     else:
-        p.valence = 0.0
+        base = 0.0
+
+    extremity = _extremity(profile, discharge)
+    p.valence = round(max(-1.0, base - SHOCK_VALENCE_WEIGHT * extremity), 4)
 
     # --- luminosity: temperature anomaly, if we have it ---
     if temperature is not None and temp_baseline is not None:
