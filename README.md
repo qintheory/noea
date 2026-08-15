@@ -2,12 +2,11 @@
 
 **Noéa** — "Affective AI for Water-Climate" — is a project by
 [Meeting of Waters](https://www.meetingofwaters.org), an art-driven NGO
-founded by Charlotte Qin (Geneva, Switzerland, active since 2022), built in
-collaboration with HKUST, GainForest, ETH Eawag, the Hong Kong Observatory,
-and the World Meteorological Organization. Noéa reads hydrometeorological
-data as an affective signal rather than a purely technical one — treating a
-river's flow or a city's rainfall record as something with its own rhythm,
-memory, and mood, alongside the scientific rigor of the data itself.
+founded by Charlotte Qin (Geneva, Switzerland, active since 2022). Noéa
+reads hydrometeorological data as an affective signal rather than a purely
+technical one — treating a river's flow or a city's rainfall record as
+something with its own rhythm, memory, and mood, alongside the scientific
+rigor of the data itself.
 
 Full project background, design essays, and the published Issue series live
 at **[meetingofwaters.org/noea](https://www.meetingofwaters.org/noea)**.
@@ -163,14 +162,14 @@ scaffolding, not a settled spec, until that confirmation happens.
 
 Every module ultimately produces the same `XRParameters` shape:
 
-| field         | range   | drives (XR)        | drives (sound)       | drives (fountain)    |
-|---------------|---------|--------------------|----------------------|----------------------|
-| diameter      | 0..1    | body size           | —                    | pump speed / height  |
-| luminosity    | 0..1    | emission glow        | —                    | (optional lighting)  |
-| texture       | 0..1    | surface roughness    | —                    | —                    |
-| pulse_rhythm  | 0.4..1.6| animation tempo       | tempo                | surge rate           |
-| valence       | -1..+1  | colour temperature    | major/minor, silence | stillness vs motion  |
-| arousal       | 0..1    | overall intensity     | sound intensity      | vigour               |
+| field         | range   | drives (XR)        | drives (sound)       |
+|---------------|---------|--------------------|----------------------|
+| diameter      | 0..1    | body size           | —                    |
+| luminosity    | 0..1    | emission glow        | —                    |
+| texture       | 0..1    | surface roughness    | —                    |
+| pulse_rhythm  | 0.4..1.6| animation tempo       | tempo                |
+| valence       | -1..+1  | colour temperature    | major/minor, silence |
+| arousal       | 0..1    | overall intensity     | sound intensity      |
 
 ## Design principle
 
