@@ -62,18 +62,20 @@ python3 demo_climate_pulse.py
 Loads Hong Kong Observatory daily rainfall (1884–2025, `climate_pulse/data/rainfall.csv`),
 computes an ECG-inspired diagnostic per year (R = annual peak rainfall, RR =
 days between peaks, S = dry-season anomaly, plus deviation from a rolling
-30-year norm and both an empirical and a Gumbel-fitted return period), then
-maps each year to `XRParameters`. Includes a first k-means pass toward
-learned mood archetypes (`clustering.py`) — **actively being tuned**; the
-deterministic per-year formulas in `mapping.py` are the stable fallback.
+30-year norm, peak-concentration, and both an empirical and a Gumbel-fitted
+return period), then maps each year to `XRParameters`. `mapping.py` scores
+valence and arousal continuously from each year's own features — no
+clustering: an earlier k-means archetype pass diluted exactly the outlier
+years it was meant to catch (a shock year's signal disappeared once
+averaged into a 40+ member "wetter" cluster), so it was dropped in favour
+of scoring every year independently.
 
-**Known limitations, honestly**: the emotional mapping currently reads
-extreme/shock years correctly (negative valence, high arousal) but doesn't
-yet give drought years an equivalently negative reading — see commit
-history and project notes for the ongoing diagnosis. Return periods are
-capped by methodology (empirical: ~sample size; Gumbel-fitted: better, but
-may still diverge from press-reported figures, likely a rolling-24h vs.
-calendar-day data definition difference rather than a modeling error).
+**Known limitation, honestly**: Gumbel-fitted return periods are the
+standard method for this kind of data and can extrapolate past the sample
+size (unlike the empirical/Weibull version, capped at ~135 years), but may
+still diverge from press-reported figures like "1-in-500-years" — likely a
+rolling-24h vs. calendar-day data definition difference rather than a
+modeling error.
 
 ## noea/ — River (Human-Water Interface prototype)
 
@@ -120,8 +122,7 @@ separation is the whole point, and it holds independently in both modules.
 - `climate_pulse/models.py`    — YearlyPulse, DiagnosticProfile
 - `climate_pulse/loaders.py`   — HKO rainfall CSV → TimeSeries
 - `climate_pulse/frameworks.py`— R/RR/S/deviation/return-period diagnostics
-- `climate_pulse/mapping.py`   — deterministic curatorial mapping
-- `climate_pulse/clustering.py`— k-means mood archetypes (in progress)
+- `climate_pulse/mapping.py`   — continuous curatorial mapping (no clustering)
 - `demo_climate_pulse.py`      — Climate Pulse end-to-end example
 
 ## References

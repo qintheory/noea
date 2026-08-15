@@ -35,6 +35,10 @@ class YearlyPulse:
                                      # — extrapolates past the sample, matches how
                                      # agencies report "1-in-N-year" events
     annual_total: float             # total rainfall this year, mm
+    peak_concentration: float       # r_value / annual_total: how much of the year's
+                                     # rain fell in a single day — independent of
+                                     # deviation_from_norm on purpose, since a year's
+                                     # total can look ordinary while one day doesn't
 
 
 @dataclass
@@ -51,3 +55,7 @@ class DiagnosticProfile:
     rr_max: float = 0.0
     stdev_min: float = 0.0
     stdev_max: float = 0.0
+    return_period_fitted_min: float = 0.0
+    return_period_fitted_max: float = 0.0
+    concentration_min: float = 0.0
+    concentration_max: float = 0.0

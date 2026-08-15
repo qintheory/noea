@@ -158,11 +158,14 @@ def build_profile(ts: TimeSeries) -> DiagnosticProfile:
             return_period=rp[y],
             return_period_fitted=rp_fit[y],
             annual_total=feat[y]["annual_total"],
+            peak_concentration=r_value / feat[y]["annual_total"] if feat[y]["annual_total"] > 0 else 0.0,
         ))
 
     r_vals = [yp.r_value for yp in years]
     rr_vals = [yp.rr_days for yp in years if yp.rr_days is not None]
     stdev_vals = [yp.stdev for yp in years]
+    rp_fit_vals = [yp.return_period_fitted for yp in years]
+    concentration_vals = [yp.peak_concentration for yp in years]
 
     return DiagnosticProfile(
         station_id=ts.station_id,
@@ -173,4 +176,8 @@ def build_profile(ts: TimeSeries) -> DiagnosticProfile:
         rr_max=max(rr_vals) if rr_vals else 0.0,
         stdev_min=min(stdev_vals) if stdev_vals else 0.0,
         stdev_max=max(stdev_vals) if stdev_vals else 0.0,
+        return_period_fitted_min=min(rp_fit_vals) if rp_fit_vals else 0.0,
+        return_period_fitted_max=max(rp_fit_vals) if rp_fit_vals else 0.0,
+        concentration_min=min(concentration_vals) if concentration_vals else 0.0,
+        concentration_max=max(concentration_vals) if concentration_vals else 0.0,
     )
