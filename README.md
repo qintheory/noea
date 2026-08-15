@@ -71,12 +71,32 @@ Loads Hong Kong Observatory daily rainfall (1884–2025,
 diagnostic per year (R = annual peak rainfall, RR = days between peaks,
 S = dry-season anomaly, plus deviation from a rolling 30-year norm,
 peak-concentration, and both an empirical and a Gumbel-fitted return
-period), then maps each year to `XRParameters`. `mapping.py` scores
-valence and arousal continuously from each year's own features — no
-clustering: an earlier k-means archetype pass diluted exactly the outlier
-years it was meant to catch (a shock year's signal disappeared once
-averaged into a 40+ member "wetter" cluster), so it was dropped in favour
-of scoring every year independently.
+period), then maps each year to `XRParameters`.
+
+**This is where the actual model lives** (`anomaly.py`): a PCA reconstruction-
+error model, fit once on every year's 6-feature vector, scoring how well
+each year's *own* feature vector reconstructs from a compressed
+representation of the whole record's shared structure — a year that
+doesn't resemble the record's dominant patterns reconstructs poorly (high
+error), and that error drives valence/arousal. This is genuinely fit and
+scored (training + inference), not a hand-picked formula — see the
+module's docstring for why PCA rather than a deep autoencoder (135
+samples is too little data for that not to just memorize every point; a
+linear autoencoder converges to PCA anyway) and why not k-means clustering
+(an earlier archetype pass diluted exactly the outliers it was meant to
+catch — a shock year's signal disappeared once averaged into a 40+ member
+"wetter" cluster).
+
+One data-quality fix this surfaced: 2025's 31-day partial year was
+initially left in the fitting set and its degenerate reconstruction error
+(a tiny denominator inflating peak-concentration) dominated the scale,
+compressing every genuine year — including 1926, the actual record flood
+— toward the bottom. Checking day-counts empirically (not guessing) found
+55 of 135 years have 268–299 days (real, if incomplete, years) and only
+2025 is truly degenerate at 26 — a large, unambiguous gap. Excluding only
+years below 200 days from fitting (while still scoring them via inference)
+fixed it without discarding ~40% of otherwise-real years the way a naive
+threshold did.
 
 **Known limitation, honestly**: Gumbel-fitted return periods are the
 standard method for this kind of data and can extrapolate past the sample
@@ -170,7 +190,8 @@ noea/
     │   ├── models.py                  — YearlyPulse, DiagnosticProfile
     │   ├── loaders.py                 — HKO rainfall CSV → TimeSeries
     │   ├── frameworks.py              — R/RR/S/deviation/return-period diagnostics
-    │   ├── mapping.py                 — continuous curatorial mapping (no clustering)
+    │   ├── anomaly.py                 — the model: PCA reconstruction-error, fit + inference
+    │   ├── mapping.py                 — curatorial mapping (uses anomaly.py's score)
     │   └── data/rainfall.csv
     └── river/
         ├── models.py                  — DiagnosticProfile (re-exports TimeSeries/XRParameters)

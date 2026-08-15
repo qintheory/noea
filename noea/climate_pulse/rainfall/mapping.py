@@ -11,19 +11,23 @@ No clustering here. An earlier version fit k-means archetypes and read
 valence/arousal off each year's cluster centroid — dropped, because
 averaging years into buckets diluted exactly the outliers it was meant to
 catch (2023's shock reading disappeared once folded into a 44-member
-"wetter" cluster; see project history). Every year is scored directly from
-its own feature values instead, continuously — there's no bucket for an
-outlier to hide inside.
+"wetter" cluster; see project history).
+
+The "how extreme was this year" signal now comes from anomaly.py's fitted
+PCA reconstruction model — a genuine unsupervised model (fit once on the
+full historical record, scored per year via inference), not a hand-picked
+formula. Every year is still scored individually, never averaged into a
+group, so an outlier can't be diluted the way clustering diluted it.
 """
 from __future__ import annotations
-import math
 
 from noea.models import XRParameters
+from .anomaly import AnomalyModel, fit_anomaly_model
 from .models import DiagnosticProfile, YearlyPulse
 
 # how far a deviation ratio has to swing before valence's "normal" component bottoms out
 VALENCE_DEVIATION_SPAN = 1.0
-# how much a single-event shock can additionally pull valence down, beyond deviation alone
+# how much the learned anomaly score can additionally pull valence down, beyond deviation alone
 SHOCK_VALENCE_WEIGHT = 1.2
 
 
@@ -34,35 +38,14 @@ def _norm(value: float, lo: float, hi: float) -> float:
     return max(0.0, min(1.0, (value - lo) / (hi - lo)))
 
 
-def _shock(profile: DiagnosticProfile, yp: YearlyPulse) -> float:
-    """How much a single event dominated this year, 0..1.
-
-    This is what catches a storm buried in an otherwise ordinary year —
-    2023 had a mild annual deviation (+0.14) but 425mm fell in one day.
-    Three independent readings of "how extreme," averaged: the peak's raw
-    size, its statistical rarity (Gumbel-fitted, so genuinely rare events
-    register even past the sample size), and what fraction of the whole
-    year's rain landed in that single day.
-
-    Rarity is log-scaled before normalising: return periods span 1 to
-    ~244 years and that top end (1926) is itself a huge outlier, so a
-    plain linear scale crushes everything else into "moderate" — 2023's
-    genuinely rare 49-year return period read as only 0.2 on a linear
-    0..244y scale. log10 keeps the ordering but stops one outlier from
-    setting the scale for everyone else.
-    """
-    magnitude = _norm(yp.r_value, profile.r_min, profile.r_max)
-    rarity = _norm(math.log10(yp.return_period_fitted),
-                    math.log10(profile.return_period_fitted_min),
-                    math.log10(profile.return_period_fitted_max))
-    concentration = _norm(yp.peak_concentration,
-                           profile.concentration_min, profile.concentration_max)
-    return (magnitude + rarity + concentration) / 3.0
-
-
-def map_year(profile: DiagnosticProfile, yp: YearlyPulse) -> XRParameters:
+def map_year(profile: DiagnosticProfile, yp: YearlyPulse, anomaly: AnomalyModel) -> XRParameters:
     """Turn one year's rainfall rhythm into XR parameters, using the
     station's own all-time range for context (what counts as extreme here).
+
+    `anomaly` is the model fit once (in map_series) on the whole record —
+    this is what catches a storm buried in an otherwise ordinary year
+    (2023: mild annual deviation, +0.14, but 425mm fell in one day) without
+    needing deviation itself to be extreme.
     """
     p = XRParameters(station_id=profile.station_id, timestamp=yp.r_date)
 
@@ -78,10 +61,10 @@ def map_year(profile: DiagnosticProfile, yp: YearlyPulse) -> XRParameters:
     else:
         p.pulse_rhythm = 1.0
 
-    shock = _shock(profile, yp)
+    shock = anomaly.normalized(yp.year)
 
-    # --- arousal: this year's own peak/rhythm urgency, plus how much a
-    # single event dominated it ---
+    # --- arousal: this year's own peak/rhythm urgency, plus the learned
+    # anomaly score (how much this year's whole feature profile stands out) ---
     magnitude = _norm(yp.r_value, profile.r_min, profile.r_max)
     urgency = (1.0 - _norm(yp.rr_days, profile.rr_min, profile.rr_max)
                if yp.rr_days is not None else 0.5)
@@ -107,5 +90,6 @@ def map_year(profile: DiagnosticProfile, yp: YearlyPulse) -> XRParameters:
 
 
 def map_series(profile: DiagnosticProfile) -> list[XRParameters]:
-    """Map every year in the profile to one XRParameters frame."""
-    return [map_year(profile, yp) for yp in profile.years]
+    """Fit the anomaly model once on the full record, then map every year."""
+    anomaly = fit_anomaly_model(profile)
+    return [map_year(profile, yp, anomaly) for yp in profile.years]

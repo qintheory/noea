@@ -39,6 +39,10 @@ class YearlyPulse:
                                      # rain fell in a single day — independent of
                                      # deviation_from_norm on purpose, since a year's
                                      # total can look ordinary while one day doesn't
+    n_days: int                     # days of data actually present this year — a
+                                     # partial year (e.g. data cutting off in January)
+                                     # produces distorted per-year stats, so downstream
+                                     # consumers (anomaly.py) can exclude incomplete years
 
 
 @dataclass

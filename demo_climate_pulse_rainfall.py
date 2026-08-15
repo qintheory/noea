@@ -5,17 +5,18 @@ Run:  python3 demo_climate_pulse_rainfall.py
 
 Loads Hong Kong's daily rainfall record (HKO, 1884-2025), builds the
 climate diagnostic profile (R/RR/S/deviation/return-period/peak-
-concentration per year), maps every year to XR parameters, and writes the
-frames to climate_pulse_output.json.
+concentration per year), fits the PCA anomaly model on the full record,
+maps every year to XR parameters, and writes the frames to
+climate_pulse_output.json.
 
-No clustering — every year is scored continuously and independently from
-its own feature values (see mapping.py for why the archetype/clustering
-approach was dropped).
+No clustering — the anomaly score comes from a fitted unsupervised model
+(anomaly.py) scored per year individually, never averaged into a group
+(see mapping.py for why the earlier archetype/clustering approach was
+dropped).
 """
 import json
 
-from noea.climate_pulse.rainfall import build_profile, load_rainfall, map_series
-from noea.climate_pulse.rainfall.mapping import _shock
+from noea.climate_pulse.rainfall import build_profile, fit_anomaly_model, load_rainfall, map_series
 
 KNOWN_YEARS = {
     1926: "single overwhelming pulse (Issue 4)",
@@ -36,6 +37,11 @@ def main():
     print(f"  RR range : {profile.rr_min:.0f} - {profile.rr_max:.0f} days")
     print()
 
+    anomaly = fit_anomaly_model(profile)
+    print(f"ANOMALY MODEL — PCA, {anomaly.pca.n_components_} components, "
+          f"explained variance {sum(anomaly.explained_variance_ratio):.1%}")
+    print()
+
     params = map_series(profile)
     payload = [p.as_dict() for p in params]
     with open("climate_pulse_output.json", "w") as f:
@@ -51,7 +57,8 @@ def main():
         print(f"{year} — {label}")
         print(f"   R={yp.r_value:.1f}mm  dev={yp.deviation_from_norm:+.2f}  "
               f"return_period(fitted)={yp.return_period_fitted:.1f}y  "
-              f"concentration={yp.peak_concentration:.2f}  shock={_shock(profile, yp):.2f}")
+              f"concentration={yp.peak_concentration:.2f}  "
+              f"anomaly={anomaly.normalized(year):.2f}")
         print(f"   diameter {d['diameter']:.2f}  arousal {d['arousal']:.2f}  "
               f"rhythm {d['pulse_rhythm']:.2f}  valence {d['valence']:+.2f}")
 

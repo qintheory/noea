@@ -8,6 +8,7 @@ from .loaders import load_rainfall
 from .frameworks import build_profile
 from .mapping import map_series, map_year
 from .models import YearlyPulse, DiagnosticProfile
+from .anomaly import AnomalyModel, fit_anomaly_model
 
 __all__ = [
     "load_rainfall",
@@ -16,4 +17,6 @@ __all__ = [
     "map_year",
     "YearlyPulse",
     "DiagnosticProfile",
+    "AnomalyModel",
+    "fit_anomaly_model",
 ]

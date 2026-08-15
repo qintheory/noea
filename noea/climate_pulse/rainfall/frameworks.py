@@ -76,6 +76,7 @@ def annual_features(ts: TimeSeries) -> dict[int, dict]:
             "stdev": statistics.pstdev(vals) if len(vals) > 1 else 0.0,
             "wet_day_frequency": wet_days / len(vals),
             "annual_total": sum(vals),
+            "n_days": len(vals),
         }
     return out
 
@@ -159,6 +160,7 @@ def build_profile(ts: TimeSeries) -> DiagnosticProfile:
             return_period_fitted=rp_fit[y],
             annual_total=feat[y]["annual_total"],
             peak_concentration=r_value / feat[y]["annual_total"] if feat[y]["annual_total"] > 0 else 0.0,
+            n_days=feat[y]["n_days"],
         ))
 
     r_vals = [yp.r_value for yp in years]
