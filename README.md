@@ -2,8 +2,8 @@
 
 **Noéa** — "Affective AI for Water-Climate" — is a project by
 [Meeting of Waters](https://www.meetingofwaters.org), an art-driven NGO
-founded by Charlotte Qin (Geneva, Switzerland, active since 2022). Noéa
-reads hydrometeorological data as an affective signal rather than a purely
+based in Geneva, Switzerland, active since 2022. Noéa reads
+hydrometeorological data as an affective signal rather than a purely
 technical one — treating a river's flow or a city's rainfall record as
 something with its own rhythm, memory, and mood, alongside the scientific
 rigor of the data itself.
