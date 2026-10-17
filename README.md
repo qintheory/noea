@@ -11,6 +11,32 @@ rigor of the data itself.
 Full project background, design essays, and the published Issue series live
 at **[meetingofwaters.org/noea](https://www.meetingofwaters.org/noea)**.
 
+## In short
+
+Noéa translates long hydrological records into something people can
+experience. It reads a record — rainfall, river discharge — the way a
+cardiologist reads an ECG, looking for rhythm, memory and shock. It then maps
+what it finds to six XR parameters, two of them affective — **valence** (how
+pleasant or distressing) and **arousal** (how activated) — alongside four
+physical readouts (size, glow, texture, tempo). These are designed to feed an
+XR and sound experience; that output contract is still unconfirmed (see
+below).
+
+Two layers, kept deliberately apart. The **science layer** is plain
+hydrology: for Hong Kong, over a century of daily rainfall from the
+Observatory — annual peaks, the gaps between them, return periods; for the
+Rhine and its alpine tributaries, eight stations of discharge — flow
+duration, recession, the seasonal cycle. The **curatorial layer** decides how
+a drought or a flood should feel, in one place, so that can change without
+touching the science.
+
+Machine learning has one job so far: finding unusual years. For each record
+an unsupervised model learns what a typical year looks like, then scores how
+badly each year fails to fit it.
+
+The method is designed to apply to any long record. Hong Kong rainfall and
+the Rhine and alpine discharge are the worked examples, not the scope.
+
 ## Noéa is the umbrella
 
 Noéa is the affective intelligence itself — the umbrella for every module
@@ -195,9 +221,13 @@ What it actually does, checked rather than assumed:
 - **It flags documented floods.** The top-scoring years include Lustenau
   and Aare-Brienzwiler 2005 (each station's all-time maximum, 22–23 Aug),
   Aare-Thun 1999 (all-time maximum, 15 May) and Köln and Lobith 1993
-  (24–25 Dec). Those dates match the August 2005 Alpine flood, the May 1999
-  Swiss flood and the Christmas 1993 Rhine flood; the match is to events
-  recalled from background knowledge, not verified against a source.
+  (24–25 Dec). Those dates match the
+  [August 2005 Alpine floods](https://en.wikipedia.org/wiki/2005_European_floods),
+  the [May 1999 Swiss floods](https://www.wsl.ch/en/natural-hazards/understanding-and-forecasting-floods/flood-and-landslide-damage-database/major-events/)
+  (Thun, on the Aare) and the
+  [Christmas 1993 Rhine flood](https://www.wetteronline.de/extremwetter/weihnachtshochwasser-am-rhein-evakuierungen-und-sachschaeden-1993-12-24-wh)
+  (Köln's gauge peaked on Christmas Eve). The model was never given these
+  events; it scored the years as unusual from the discharge record alone.
 - **It does not flag droughts, or the 1995 flood at Köln.** 1976 ranks
   188th of 209 years at Köln, and 1995 ranks 102nd. PCA reconstruction
   error finds years whose *combination* of features is unusual, not years
