@@ -16,13 +16,14 @@ at **[meetingofwaters.org/noea](https://www.meetingofwaters.org/noea)**.
 Noéa translates long hydrological records into something people can
 experience. It reads a record — rainfall, river discharge — the way a
 cardiologist reads an ECG, looking for rhythm, memory and shock. It then maps
-what it finds to six XR parameters, two of them affective — **valence** (how
-pleasant or distressing) and **arousal** (how activated) — alongside four
-physical readouts (size, glow, texture, tempo). These are designed to feed an
-XR and sound experience; that output contract is still unconfirmed (see
-below).
+what it finds to two affective values, **valence** (pleasant to unpleasant)
+and **arousal** (calm to activated), following Russell's circumplex model of
+affect (Russell, 1980; adopted in Noéa Issue 4). These are set by design in
+the curatorial layer, not measured in the water. They are designed to feed an
+XR and sound experience; the output contract is provisional and still
+unconfirmed (see below).
 
-Two layers, kept deliberately apart. The **science layer** is plain
+Two layers, kept deliberately apart. The **diagnostic layer** is plain
 hydrology: for Hong Kong, over a century of daily rainfall from the
 Observatory — annual peaks, the gaps between them, return periods; for the
 Rhine and its alpine tributaries, eight stations of discharge — flow
@@ -46,10 +47,13 @@ A seven-slide introduction is in [`docs/`](docs/) as a
 [PDF](docs/noea-introduction.pdf) and an editable
 [PowerPoint](docs/noea-introduction.pptx) with speaker notes, plus a
 [variant whose cover animates](docs/noea-introduction-animated.pptx), a
-[single-file HTML version](docs/noea-introduction.html) (open it in a browser;
+[single-file HTML version](docs/introduction.html) (open it in a browser;
 arrow keys to move, N for notes) and the
 [Hong Kong ECG as a GIF](docs/hk-heartbeat.gif), all redrawn from
-[hkheartbeat](https://github.com/qintheory/hkheartbeat).
+[hkheartbeat](https://github.com/qintheory/hkheartbeat). The cover's ECG as a
+10-second [MP4](docs/noea-cover-ecg.mp4) and [GIF](docs/noea-cover-ecg.gif) is
+for video use. The deck is generated: all of its text is in
+[`docs/source/content.py`](docs/source/content.py), edited there and rebuilt.
 
 The method is designed to apply to any long record. Hong Kong rainfall and
 the Rhine and alpine discharge are the worked examples, not the scope.
@@ -93,7 +97,7 @@ What "universal" does and doesn't mean here:
 - **It is a design goal tested on two records, not a demonstrated result.**
   No third site has been run through it yet.
 - **A new kind of series needs its own diagnostics.** Rainfall and discharge
-  each have their own science layer. Something like groundwater levels would
+  each have their own diagnostic layer. Something like groundwater levels would
   need one too; what carries over is the shared contract and the per-record
   modelling approach.
 
@@ -120,7 +124,7 @@ raw data (rainfall, discharge, ...)
   TimeSeries            (noea/models.py — shared vocabulary)
       │
       ▼
-  diagnostic framework   (frameworks.py — scientific layer, deterministic)
+  diagnostic framework   (frameworks.py — diagnostic layer, deterministic)
       │
       ▼
   DiagnosticProfile      (the station's fingerprint — shape differs per module)
@@ -245,8 +249,12 @@ What it actually does, checked rather than assumed:
   [Christmas 1993 Rhine flood](https://www.wetteronline.de/extremwetter/weihnachtshochwasser-am-rhein-evakuierungen-und-sachschaeden-1993-12-24-wh)
   (Köln's gauge peaked on Christmas Eve). The model was never given these
   events; it scored the years as unusual from the discharge record alone.
-- **It does not flag droughts, or the 1995 flood at Köln.** 1976 ranks
-  188th of 209 years at Köln, and 1995 ranks 102nd. PCA reconstruction
+- **It does not reliably flag droughts, and it misses the 1995 flood at
+  Köln.** 1976 ranks 188th of 209 years at Köln, though 3rd of 70 at
+  Lustenau (and Basel's second-highest year is the 1972 drought), and the
+  1995 Köln flood ranks 102nd. (The Köln ranks here include the partial
+  first year, 1816; the deck leaves it out, so its Köln numbers are one
+  lower.) PCA reconstruction
   error finds years whose *combination* of features is unusual, not years
   that are extreme *along* the main wet-to-dry axis, and a drought sits on
   that axis. Drought still reads through the day-level formulas and the
@@ -303,7 +311,7 @@ Every module ultimately produces the same `XRParameters` shape:
 
 ## Design principle
 
-The **scientific layer** (`frameworks.py` in each module) is objective and
+The **diagnostic layer** (`frameworks.py` in each module) is objective and
 never changes for artistic reasons. The **curatorial layer** (`mapping.py`)
 is where every artistic decision lives — how drought should feel, where
 valence sits. Tune the art there without ever touching the science. That
@@ -342,6 +350,8 @@ demo_climate_pulse_river.py      — river, real GRDC/FOEN data (8 stations)
 - Meeting of Waters — Noéa project: https://www.meetingofwaters.org/noea
 - Noéa Issue 3, "Hong Kong Heartbeat" (March 2025)
 - Noéa Issue 4, "Affective Climate" (June 2025)
+- Russell, J. A. (1980). A circumplex model of affect. *Journal of Personality
+  and Social Psychology*, 39(6), 1161–1178. (Valence and arousal axes; cited in Issue 4.)
 - Noéa Issue 6, "River Anatomy" (April 2026)
 - Rainfall data: Hong Kong Observatory (HKO)
 - River discharge data: Global Runoff Data Centre (GRDC); Swiss Federal

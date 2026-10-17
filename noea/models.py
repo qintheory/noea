@@ -62,7 +62,10 @@ class XRParameters:
     These are exactly the values a downstream module reads:
       - XR mesh:      diameter, luminosity, texture, pulse_rhythm
       - sonification: valence, arousal, pulse_rhythm
-      - fountain:     diameter (-> pump speed), pulse_rhythm (-> surge rate)
+
+    valence and arousal are the two axes of Russell's circumplex model of affect
+    (Russell, 1980, J. Personality and Social Psychology 39(6); adopted in Noéa
+    Issue 4). They are set by the curatorial layer, not measured in the water.
 
     timestamp lets the consumer scrub through time (a performance, a loop).
     """
