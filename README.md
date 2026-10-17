@@ -34,6 +34,10 @@ Machine learning has one job so far: finding unusual years. For each record
 an unsupervised model learns what a typical year looks like, then scores how
 badly each year fails to fit it.
 
+A seven-slide introduction is in [`docs/`](docs/) as a
+[PDF](docs/noea-introduction.pdf) and an editable
+[PowerPoint](docs/noea-introduction.pptx) with speaker notes.
+
 The method is designed to apply to any long record. Hong Kong rainfall and
 the Rhine and alpine discharge are the worked examples, not the scope.
 
@@ -211,7 +215,7 @@ Köln and Lobith average +0.13 in the 1980s against about −0.07 in the 2010s
 data ends in 2020).
 
 `anomaly.py` then fits one PCA reconstruction-error model per station on
-its own years (six scale-free features; 62–209 rows each; 56–73% of variance
+its own years (six scale-free features; 62–208 years each; 56–73% of variance
 retained in two components), the same technique as the rainfall module,
 reimplemented rather than imported because the two modules are independent.
 `map_series(..., yearly=, anomaly=)` gives each day the context of its year.
