@@ -35,6 +35,13 @@ Machine learning has one job so far: finding unusual years. For each record
 an unsupervised model learns what a typical year looks like, then scores how
 badly each year fails to fit it.
 
+What hasn't been tested is the human side, which is where the real result
+lies: the model's output is a score, not a feeling. Nobody has yet checked
+whether people perceive the emotion the system intends, understand what a
+flag (or its absence) means — a drought looks like an ordinary dry year to the
+learned model — or decide differently because of it. That is the next
+research step, not something this repository claims to have done.
+
 A seven-slide introduction is in [`docs/`](docs/) as a
 [PDF](docs/noea-introduction.pdf) and an editable
 [PowerPoint](docs/noea-introduction.pptx) with speaker notes.
