@@ -72,7 +72,7 @@ S = dry-season anomaly, plus deviation from a rolling 30-year norm,
 peak-concentration, and both an empirical and a Gumbel-fitted return
 period), then maps each year to `XRParameters`.
 
-**This is where the actual model lives** (`anomaly.py`): a PCA reconstruction-
+**The rainfall model** (`anomaly.py`; the river module has its own, below): a PCA reconstruction-
 error model, fit once on every year's 6-feature vector, scoring how well
 each year's *own* feature vector reconstructs from a compressed
 representation of the whole record's shared structure — a year that
