@@ -32,6 +32,42 @@ applied to different data — neither imports from the other, and each has
 its own loaders, diagnostics, and curatorial decisions. What they share
 is the contract below, and `noea/models.py`, which defines it.
 
+## Designed to be universal
+
+Noéa is a method, not a Hong Kong model or a Rhine model. Any long
+hydrometeorological record can be run through the same load → diagnose → map
+pipeline: write a loader that produces a `TimeSeries` and the rest takes
+over. Hong Kong rainfall and the Rhine and alpine discharge records are the
+two worked examples — the sample records the methods were built and tested
+on — not the scope of the system.
+
+What "universal" does and doesn't mean here:
+
+- **The method transfers; the fitted model doesn't.** Every record fits its
+  own model on its own history (one for the rainfall record, one per river
+  station) and is judged against its own norm. A Hong Kong model is never
+  applied to the Rhine, and nothing pretrained is shipped or reused.
+- **It is a design goal tested on two records, not a demonstrated result.**
+  No third site has been run through it yet.
+- **A new kind of series needs its own diagnostics.** Rainfall and discharge
+  each have their own science layer. Something like groundwater levels would
+  need one too; what carries over is the shared contract and the per-record
+  modelling approach.
+
+What is currently tied to the two sample sites and would need revisiting for
+a new region:
+
+- **Rainfall season and wet-day definitions.** The dry season is November to
+  April (Hong Kong's monsoon calendar) and a wet day is 0.1 mm or more (the
+  Observatory's convention). A different climate regime needs its own.
+- **Data-completeness cutoffs** (200 days for rainfall, 300 for river) were
+  chosen by inspecting the gaps in these two datasets.
+- **The curatorial weights** — how hard an extreme year pulls valence down —
+  were set while checking Hong Kong and Rhine events. They are artistic
+  judgements, and a new setting may call for its own.
+- **The Gumbel return-period fit** assumes annual maxima follow an
+  extreme-value distribution. That is standard, but worth checking per site.
+
 ## The shared contract: load → diagnose → map
 
 ```
