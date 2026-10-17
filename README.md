@@ -44,7 +44,10 @@ research step, not something this repository claims to have done.
 
 A seven-slide introduction is in [`docs/`](docs/) as a
 [PDF](docs/noea-introduction.pdf) and an editable
-[PowerPoint](docs/noea-introduction.pptx) with speaker notes.
+[PowerPoint](docs/noea-introduction.pptx) with speaker notes, plus a
+[variant whose cover animates](docs/noea-introduction-animated.pptx) and the
+[Hong Kong ECG as a GIF](docs/hk-heartbeat.gif) (redrawn from
+[hkheartbeat](https://github.com/qintheory/hkheartbeat)).
 
 The method is designed to apply to any long record. Hong Kong rainfall and
 the Rhine and alpine discharge are the worked examples, not the scope.
