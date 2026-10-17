@@ -14,7 +14,42 @@ from dataclasses import dataclass, field
 
 from noea.models import TimeSeries, XRParameters  # noqa: F401 — re-exported for `.models` imports
 
-__all__ = ["TimeSeries", "XRParameters", "DiagnosticProfile"]
+__all__ = ["TimeSeries", "XRParameters", "DiagnosticProfile", "YearlyFlow"]
+
+
+@dataclass
+class YearlyFlow:
+    """One station-year of the river's four organs, plus how it sits against
+    the trailing climatological baseline.
+
+    The whole-record DiagnosticProfile can't say "this decade runs drier than
+    the historical norm" because its statistics are computed once over the
+    entire record. One of these per year can — and gives the anomaly model
+    (anomaly.py) enough rows to fit, which eight whole-record profiles never
+    could. Mirrors rainfall's YearlyPulse in shape, not in physics.
+    """
+    station_id: str
+    year: int
+    n_days: int                    # days of data present; a partial year distorts every stat below
+
+    # pulse (hydrograph)
+    mean_flow: float
+    max_flow: float
+    min_flow: float
+
+    # personality / memory, computed on this year alone via frameworks.py
+    fdc_slope: float
+    recession_k: float
+
+    # breath: how strongly the year's flow swings across its own months
+    seasonal_amplitude: float      # (max - min monthly mean) / annual mean
+
+    # scale-free shapes (comparable across a 6 m3/s stream and a 2000 m3/s river)
+    peak_ratio: float              # max_flow / mean_flow: how spiky the year was
+    low_flow_ratio: float          # min_flow / mean_flow: how deep the drought floor went
+
+    # trend-aware baseline: this year's mean vs. the trailing 30-year mean
+    deviation_from_norm: float     # 0.0 = normal; -0.3 = 30% below the trailing norm
 
 
 @dataclass

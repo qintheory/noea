@@ -5,17 +5,25 @@ rainfall. See Issue 6 "River Anatomy".
 
 Public API:
     from noea.climate_pulse.river import build_profile, map_series
+
+    # optional year-level context (trend-aware baseline + learned anomaly):
+    yearly  = build_yearly(ts)
+    anomaly = fit_anomaly_model(yearly)
+    map_series(profile, ts, yearly=yearly, anomaly=anomaly)
 """
-from .models import TimeSeries, XRParameters, DiagnosticProfile
+from .models import TimeSeries, XRParameters, DiagnosticProfile, YearlyFlow
 from .frameworks import build_profile
 from .mapping import map_series, map_timestep
 from .loaders import load_grdc_station, load_rhine_stations, load_alpine_stations
 from .synthetic import make_leman_like
+from .yearly import build_yearly
+from .anomaly import RiverAnomalyModel, fit_anomaly_model
 
 __all__ = [
     "TimeSeries",
     "XRParameters",
     "DiagnosticProfile",
+    "YearlyFlow",
     "build_profile",
     "map_series",
     "map_timestep",
@@ -23,4 +31,7 @@ __all__ = [
     "load_rhine_stations",
     "load_alpine_stations",
     "make_leman_like",
+    "build_yearly",
+    "RiverAnomalyModel",
+    "fit_anomaly_model",
 ]

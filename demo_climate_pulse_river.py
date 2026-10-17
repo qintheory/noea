@@ -17,7 +17,8 @@ pipeline itself changed, only the data feeding it.
 import json
 
 from noea.climate_pulse.river import (
-    build_profile, load_alpine_stations, load_rhine_stations, map_series,
+    build_profile, build_yearly, fit_anomaly_model,
+    load_alpine_stations, load_rhine_stations, map_series,
 )
 
 
@@ -34,6 +35,39 @@ def print_comparison(label, stations):
     print()
 
 
+def print_year_model(label, stations):
+    """The learned component: one PCA model per station, fit on its own years."""
+    print(label)
+    print(f"  {'station':<32}{'fit yrs':>8}{'variance':>10}   most anomalous years (peak date)")
+    for name, ts in stations.items():
+        yearly = build_yearly(ts)
+        model = fit_anomaly_model(yearly)
+        top = sorted(model.scores, key=model.scores.get, reverse=True)[:3]
+        peaks = []
+        for yr in top:
+            day, _ = max(((d, v) for d, v in zip(ts.dates, ts.values) if d.year == yr),
+                         key=lambda dv: dv[1])
+            peaks.append(f"{yr} ({day:%b %d})")
+        print(f"  {name:<32}{model.n_fit:>8}{sum(model.explained_variance_ratio):>10.0%}   "
+              + ", ".join(peaks))
+    print()
+
+
+def print_trend(stations):
+    """The trend-aware baseline: mean deviation from the trailing 30-year norm."""
+    decades = (1980, 1990, 2000, 2010, 2020)
+    print("TREND-AWARE BASELINE — mean deviation from trailing 30-yr norm, by decade")
+    print(f"  {'station':<12}" + "".join(f"{d}s".rjust(8) for d in decades))
+    for name, ts in stations.items():
+        years = build_yearly(ts)
+        cells = []
+        for d in decades:
+            v = [y.deviation_from_norm for y in years if d <= y.year < d + 10]
+            cells.append(f"{sum(v) / len(v):+.2f}".rjust(8) if v else "-".rjust(8))
+        print(f"  {name:<12}" + "".join(cells))
+    print("  (2020s = 2020 only for Lustenau/Basel/Lobith; their data ends Dec 2020)\n")
+
+
 def main():
     rhine = load_rhine_stations()
     alpine = load_alpine_stations()
@@ -41,10 +75,14 @@ def main():
     print_comparison("RHINE MAINSTEM (m3/s) — the lowland/alpine transition", rhine)
     print_comparison("ALPINE HEADWATERS (m3/s) — where the body begins", alpine)
 
-    # daily XR mapping, same shape as the original synthetic demo
+    print_year_model("YEAR-LEVEL ANOMALY MODEL — PCA reconstruction error, one per station", {**rhine, **alpine})
+    print_trend(rhine)
+
+    # daily XR mapping, now with each day given the context of its year
     lustenau = rhine["Lustenau"]
     profile = build_profile(lustenau)
-    params = map_series(profile, lustenau)
+    yearly = build_yearly(lustenau)
+    params = map_series(profile, lustenau, yearly=yearly, anomaly=fit_anomaly_model(yearly))
     payload = [p.as_dict() for p in params]
     with open("xr_output.json", "w") as f:
         json.dump(payload, f, indent=2)

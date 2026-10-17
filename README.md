@@ -135,13 +135,60 @@ Validated against every named event in Issue 6, not just assumed correct:
   continued decline. The multi-decade trend is real; "still worsening
   right now" isn't confirmed by what we can actually check.
 
-**Known limitation, honestly**: `DiagnosticProfile` (river) has no
-rolling/trend-aware baseline — `monthly_means`, `q50`, `min_flow`/`max_flow`
-are computed once over the *entire* record, unlike rainfall's trailing
-30-year `deviation_from_norm`. So even though the data confirms a real
-multi-decade decline, `mapping.py` currently can't score "this decade
-feels drier than the historical norm" at all — only a single day against
-the whole-record fingerprint. Undecided whether this is worth building.
+### Year-level model and trend-aware baseline
+
+The whole-record `DiagnosticProfile` can't say a decade is running dry
+against its own recent past, and eight whole-record profiles are too few
+rows to fit anything. `yearly.py` therefore computes one `YearlyFlow` per
+station-year — reusing `frameworks.py`'s pulse / personality / memory
+functions on one-year slices, so the physics stays in one place and
+`frameworks.py` is untouched — including a deviation from the trailing
+30-year mean. That baseline sees the decline the static profile couldn't:
+Köln and Lobith average +0.13 in the 1980s against about −0.07 in the 2010s
+(the 2020s column is a single year for Basel, Lustenau and Lobith, whose
+data ends in 2020).
+
+`anomaly.py` then fits one PCA reconstruction-error model per station on
+its own years (six scale-free features; 62–209 rows each; 56–73% of variance
+retained in two components), the same technique as the rainfall module,
+reimplemented rather than imported because the two modules are independent.
+`map_series(..., yearly=, anomaly=)` gives each day the context of its year.
+Both arguments are optional; omit them and a day is read on its own.
+
+What it actually does, checked rather than assumed:
+- **It flags documented floods.** The top-scoring years include Lustenau
+  and Aare-Brienzwiler 2005 (each station's all-time maximum, 22–23 Aug),
+  Aare-Thun 1999 (all-time maximum, 15 May) and Köln and Lobith 1993
+  (24–25 Dec). Those dates match the August 2005 Alpine flood, the May 1999
+  Swiss flood and the Christmas 1993 Rhine flood; the match is to events
+  recalled from background knowledge, not verified against a source.
+- **It does not flag droughts, or the 1995 flood at Köln.** 1976 ranks
+  188th of 209 years at Köln, and 1995 ranks 102nd. PCA reconstruction
+  error finds years whose *combination* of features is unusual, not years
+  that are extreme *along* the main wet-to-dry axis, and a drought sits on
+  that axis. Drought still reads through the day-level formulas and the
+  trend-aware deviation; the learned model adds a signal, it does not
+  replace those.
+- **The year terms are centred on the station's typical year.** Applied
+  raw, an always-positive term subtracted from every day and pushed the
+  whole record about 15 points more negative; centred, it only
+  redistributes.
+
+A correction to my own earlier river valence fix: the all-time-extremity
+term first measured distance from the median across the whole range, which
+treated a routine seasonal high as a crisis. In the synthetic demo a normal
+summer melt peak read −0.77, and 57% of every station's days read negative.
+Spot checks on a flood, a drought and a typical day had all passed; a
+whole-record distribution check caught it. Extremity now applies only in the
+true tails (beyond Q10 or below Q90). Named events are unchanged (1995 flood
+−0.57 at Köln, 1976 droughts −1.00) and the synthetic peak reads −0.27.
+
+**Open calibration question**: about 50–56% of days still read negative
+(mean −0.16 to −0.22), against a balanced rainfall record. That skew comes
+from the original seasonal-ratio formula, which compares each day to the
+monthly *mean*; daily flows are right-skewed, so most days sit below it and
+are penalised steeply. It predates this work and is unchanged. Whether to
+recalibrate it is a curatorial decision, not a bug fix.
 
 No station's data reaches 2025 or 2026 (three end Dec 2020, Köln ends Dec
 2024) — any claim about current conditions needs a data update to check.
@@ -196,7 +243,9 @@ noea/
         ├── models.py                  — DiagnosticProfile (re-exports TimeSeries/XRParameters)
         ├── loaders.py                 — GRDC/FOEN discharge files → TimeSeries
         ├── frameworks.py              — pulse/personality/memory/breath diagnostics
-        ├── mapping.py                 — curatorial mapping
+        ├── yearly.py                  — one record per station-year, trend-aware baseline
+        ├── anomaly.py                 — per-station PCA reconstruction-error model
+        ├── mapping.py                 — curatorial mapping (optional year context)
         ├── synthetic.py               — synthetic Léman-like test data
         └── data/rhine/, alpine_headwaters.csv
 

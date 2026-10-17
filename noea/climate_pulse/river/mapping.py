@@ -32,10 +32,21 @@ single extreme event).
 from __future__ import annotations
 from datetime import date
 
-from .models import TimeSeries, DiagnosticProfile, XRParameters
+from .anomaly import RiverAnomalyModel
+from .models import TimeSeries, DiagnosticProfile, XRParameters, YearlyFlow
 
 # how much all-time extremity (regardless of season) can additionally pull valence down
 SHOCK_VALENCE_WEIGHT = 1.2
+
+# year-level context, both optional (see map_series). These are curatorial judgments,
+# set to MODULATE a day's own reading rather than override it (the day's extremity
+# weight above is 1.2); they were not tuned to hit any named event.
+# Both are applied RELATIVE TO THE STATION'S TYPICAL YEAR (map_series centres them):
+# an unusual year pulls valence down, a calmer-than-typical year lifts it slightly,
+# and the station's overall balance doesn't shift. Applied raw, an always-positive
+# term subtracts from every day and pushed the whole record ~15 points more negative.
+YEAR_ANOMALY_WEIGHT = 0.6      # learned: how unusual the whole year's flow pattern was
+YEAR_DEVIATION_WEIGHT = 0.4    # trend-aware: how far the year's mean sits from its trailing 30-yr norm
 
 
 def _norm(value: float, lo: float, hi: float) -> float:
@@ -47,17 +58,24 @@ def _norm(value: float, lo: float, hi: float) -> float:
 
 
 def _extremity(profile: DiagnosticProfile, discharge: float) -> float:
-    """How far today's discharge sits from the station's own median, 0..1,
-    scaled by the largest such distance on record (whichever side is
-    further — flood or drought). 0 near the middle, 1 at an all-time extreme.
+    """How deep into the station's own statistical tails today's discharge
+    sits, 0..1. Zero for the whole middle 80% of the record; rises only
+    beyond Q10 (the wettest 10% of days) or below Q90 (the driest 10%),
+    reaching 1 at the all-time maximum or minimum.
 
-    Deliberately independent of season: a record flood is a crisis whether
-    or not it happens to fall in the month that's usually wettest.
+    Independent of season on purpose: a record flood is a crisis whether or
+    not it falls in the usually-wettest month.
+
+    Tails only, not distance from the median. The first version measured
+    distance from the median across the whole range, which treated a routine
+    seasonal high as a crisis: in the synthetic demo a normal summer melt
+    peak read valence -0.77 (it should be near neutral), and 57% of every
+    station's days read negative. Found by a whole-record distribution check
+    rather than spot-checking flood and drought days, which both passed.
     """
-    span = max(profile.max_flow - profile.q50, profile.q50 - profile.min_flow)
-    if span <= 0:
-        return 0.0
-    return max(0.0, min(1.0, abs(discharge - profile.q50) / span))
+    high = _norm(discharge, profile.q10, profile.max_flow)
+    low = _norm(profile.q90 - discharge, 0.0, profile.q90 - profile.min_flow)
+    return max(high, low)
 
 
 def map_timestep(
@@ -66,9 +84,16 @@ def map_timestep(
     discharge: float,
     temperature: float | None = None,
     temp_baseline: float | None = None,
+    year_anomaly: float = 0.0,
+    year_deviation: float = 0.0,
 ) -> XRParameters:
     """Turn one moment's readings into XR parameters, using the profile
     for context (what counts as high/low for THIS station).
+
+    year_anomaly and year_deviation describe the YEAR this day sits in, each
+    already centred on the station's typical year by map_series (positive =
+    more unusual than typical, negative = calmer). Both default to 0, which
+    reproduces the original day-only behaviour exactly.
     """
     p = XRParameters(station_id=profile.station_id, timestamp=when)
 
@@ -110,7 +135,10 @@ def map_timestep(
         base = 0.0
 
     extremity = _extremity(profile, discharge)
-    p.valence = round(max(-1.0, base - SHOCK_VALENCE_WEIGHT * extremity), 4)
+    p.valence = round(max(-1.0, base
+                          - SHOCK_VALENCE_WEIGHT * extremity
+                          - YEAR_ANOMALY_WEIGHT * year_anomaly
+                          - YEAR_DEVIATION_WEIGHT * year_deviation), 4)
 
     # --- luminosity: temperature anomaly, if we have it ---
     if temperature is not None and temp_baseline is not None:
@@ -129,11 +157,28 @@ def map_series(
     profile: DiagnosticProfile,
     discharge_ts: TimeSeries,
     temperature_ts: TimeSeries | None = None,
+    yearly: list[YearlyFlow] | None = None,
+    anomaly: RiverAnomalyModel | None = None,
 ) -> list[XRParameters]:
     """Map a whole discharge series to a list of XRParameters (one per day).
 
     Optional temperature series is matched by date where present.
+
+    Pass `yearly` (yearly.build_yearly) and `anomaly` (anomaly.fit_anomaly_model)
+    to give every day the context of its year: the learned anomaly score and the
+    trend-aware deviation from the trailing norm. Omit them and each day is read
+    on its own, exactly as before.
     """
+    # centre both year signals on the station's typical year (see YEAR_*_WEIGHT note)
+    dev_by_year: dict[int, float] = {}
+    anomaly_by_year: dict[int, float] = {}
+    if yearly and anomaly:
+        absdev = {y.year: min(1.0, abs(y.deviation_from_norm)) for y in yearly}
+        anom = {y.year: anomaly.normalized(y.year) for y in yearly}
+        mean_dev = sum(absdev.values()) / len(absdev)
+        mean_anom = sum(anom.values()) / len(anom)
+        dev_by_year = {yr: v - mean_dev for yr, v in absdev.items()}
+        anomaly_by_year = {yr: v - mean_anom for yr, v in anom.items()}
     temp_lookup: dict[date, float] = {}
     temp_baseline = None
     if temperature_ts is not None:
@@ -152,6 +197,8 @@ def map_series(
                 discharge=v,
                 temperature=temp_lookup.get(d),
                 temp_baseline=temp_baseline,
+                year_anomaly=anomaly_by_year.get(d.year, 0.0),
+                year_deviation=dev_by_year.get(d.year, 0.0),
             )
         )
     return out
