@@ -26,9 +26,10 @@ Two layers, kept deliberately apart. The **science layer** is plain
 hydrology: for Hong Kong, over a century of daily rainfall from the
 Observatory — annual peaks, the gaps between them, return periods; for the
 Rhine and its alpine tributaries, eight stations of discharge — flow
-duration, recession, the seasonal cycle. The **curatorial layer** decides how
-a drought or a flood should feel, in one place, so that can change without
-touching the science.
+duration, recession, the seasonal cycle. The **curatorial layer** decides what
+a drought or a flood should feel like: how alarming, how heavy. It is kept
+separate from the measurements, so the feeling can be redesigned without
+changing any of the science.
 
 Machine learning has one job so far: finding unusual years. For each record
 an unsupervised model learns what a typical year looks like, then scores how
