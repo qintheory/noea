@@ -37,13 +37,15 @@ INTERVALS = {"daily": 86400, "hourly": 3600, "15min": 900, "5min": 300}
 # measurement_set_id (the number in station_view.php?measurement_set_id=...), read from the
 # station lists on 24 Oct 2026. Aire gauges first; rain station is Pont-Rouge's associated one.
 STATIONS = {
-    "PR_": dict(id=130, name="Aire - Pont-Rouge", watercourse="Aire", media=["flow"]),
-    "CS_": dict(id=56, name="Aire - Centenaire", watercourse="Aire", media=["flow", "temperature"]),
-    "BS_": dict(id=37, name="Aire - Bossenailles", watercourse="Aire", media=["flow"]),
+    "PR_": dict(id=130, name="Aire - Pont-Rouge", watercourse="Aire", media=["flow"], rain="BA_"),
+    "CS_": dict(id=56, name="Aire - Centenaire", watercourse="Aire", media=["flow", "temperature"], rain="BA_"),
+    "BS_": dict(id=37, name="Aire - Bossenailles", watercourse="Aire", media=["flow"], rain="DD_"),
     "AG_": dict(id=11, name="Aire, Confignon - Amont Galerie", watercourse="Aire", media=["flow"]),
     "LR_": dict(id=184, name="Laire - Racleret", watercourse="Laire (to confirm)", media=["flow", "temperature"]),
     "BA_": dict(id=26, name="Bachet-de-Pesay (rain)", watercourse=None, media=["rain"]),
+    "DD_": dict(id=59, name="David-Dufour (rain)", watercourse=None, media=["rain"]),
 }
+# "rain" above is each gauge's associated rain station, as listed on its OCEau station page.
 UNITS = {"flow": "m3/s", "temperature": "degC", "rain": "mm"}
 
 

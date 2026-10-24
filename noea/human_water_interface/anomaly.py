@@ -31,7 +31,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 from noea.models import TimeSeries
-from .baselines import SeasonalBaseline
+from .baselines import SeasonalBaseline, day_index
 from .models import IntradaySeries
 
 FEATURE_NAMES = ["flow_anom", "dlog_flow", "peak_ratio", "max_rise", "rain_day", "rain_3day", "rain_antecedent"]
@@ -77,6 +77,9 @@ class DayModel:
     train_errors: np.ndarray
     explained_variance_ratio: list[float]
     scores: dict[date, float] = field(default_factory=dict)
+    features: dict[date, list[float]] = field(default_factory=dict)     # every day's feature vector
+    train_logflow: np.ndarray = field(default_factory=lambda: np.array([]))
+    train_features: np.ndarray = field(default_factory=lambda: np.array([]))
 
     def percentile(self, error: float) -> float:
         """Where an error sits among the training days' errors, 0..1 (1 = worse than all of them)."""
@@ -101,6 +104,9 @@ def fit_day_model(flow: IntradaySeries, rain: TimeSeries, train_years: list[int]
     err = np.sum((X - pca.inverse_transform(pca.transform(X))) ** 2, axis=1)
 
     model = DayModel(scaler, pca, base, list(train_years), err, [float(v) for v in pca.explained_variance_ratio_])
+    model.features = feats
+    model.train_features = X_raw
+    model.train_logflow = np.array([feats[d][0] + base.median[day_index(d)] for d in train])   # log10 mean flow
     for d, row in feats.items():
         x = scaler.transform([row])
         model.scores[d] = float(np.sum((x - pca.inverse_transform(pca.transform(x))) ** 2))
