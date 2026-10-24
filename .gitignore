@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 xr_output.json
 climate_pulse_output.json
+
+# OCEau raw exports: terms of use not confirmed, so the data is fetched, not committed
+noea/human_water_interface/data/
