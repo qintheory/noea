@@ -45,7 +45,29 @@ they share only the `TimeSeries` and `XRParameters` shapes in
   and in the Swiss Alps (GRDC and FOEN).
 
 The method is designed to apply to any long record; these two are the
-worked examples, not the scope. A Human-Water Interface module is planned.
+worked examples, not the scope.
+
+The **Human-Water Interface** (`noea/human_water_interface/`) is the local
+counterpart, in development; see below.
+
+## Human-Water Interface (in development)
+
+Where Climate Pulse reads long records, the Human-Water Interface (HWI) works at
+the scale of one river and the people beside it: short, fast records from a few
+nearby sensors. The first site is **L'Aire, Geneva**. Three steps so far:
+
+1. **Load and check.** Validated daily and hourly flow and rain are loaded,
+   checked for gaps and bad values, and each gauge gets its own seasonal norm.
+2. **Learn.** An unsupervised model learns what a usual day looks like at each
+   gauge and scores how unusual each day is. It is fitted on 2014–2022 and tested
+   on 2023–2025, years it never saw.
+3. **Map.** The curatorial layer turns the seasonal norm and the learned score
+   into valence and arousal, plus size, tempo and texture, one frame per day.
+
+Data: the cantonal monitoring network, *Veille Hydro-météorologique du Canton de
+Genève*, run for the Office cantonal de l'eau (OCEau). Only its validated history
+export is used. The data is not stored in this repository: fetch it with
+`python3 -m noea.human_water_interface.fetch`.
 
 ## Run
 
@@ -55,6 +77,7 @@ Needs Python with numpy, scipy and scikit-learn.
 python3 demo_climate_pulse_rainfall.py   # Hong Kong rainfall
 python3 demo_climate_pulse_river.py      # eight river stations
 python3 demo.py                          # river, synthetic data
+python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data
 ```
 
 ## Layout
@@ -65,6 +88,7 @@ noea/
 └── climate_pulse/
     ├── rainfall/              loaders, frameworks, anomaly, mapping, data/
     └── river/                 loaders, frameworks, yearly, anomaly, mapping, data/
+noea/human_water_interface/    loaders, quality, baselines, anomaly, mapping
 docs/                          introduction and its source
 ```
 
@@ -79,4 +103,5 @@ curatorial layer; `anomaly.py` is the learned model.
 - Russell, J. A. (1980). A circumplex model of affect. *Journal of Personality
   and Social Psychology*, 39(6), 1161–1178.
 - Data: Hong Kong Observatory (HKO); Global Runoff Data Centre (GRDC); Swiss
-  Federal Office for the Environment (FOEN)
+  Federal Office for the Environment (FOEN); Office cantonal de l'eau, Geneva
+  (OCEau)
