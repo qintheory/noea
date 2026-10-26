@@ -10,9 +10,9 @@ Independent of the Climate Pulse modules: it shares only TimeSeries and
 XRParameters from noea.models.
 """
 from .loaders import (
-    STATIONS, MEDIA, fetch_export, parse_export, load_daily, load_intraday, coverage,
+    STATIONS, RAIN_STATIONS, MEDIA, fetch_export, parse_export, load_daily, load_intraday, coverage,
 )
 from .models import IntradaySeries
 
-__all__ = ["STATIONS", "MEDIA", "fetch_export", "parse_export", "load_daily",
+__all__ = ["STATIONS", "RAIN_STATIONS", "MEDIA", "fetch_export", "parse_export", "load_daily",
            "load_intraday", "coverage", "IntradaySeries"]

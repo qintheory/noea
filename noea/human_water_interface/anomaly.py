@@ -35,14 +35,26 @@ from .baselines import SeasonalBaseline, day_index
 from .models import IntradaySeries
 
 FEATURE_NAMES = ["flow_anom", "dlog_flow", "peak_ratio", "max_rise", "rain_day", "rain_3day", "rain_antecedent"]
+# optional, appended after the seven above when the extra rain data is given:
+#   rain_area        log10(1 + mean rain over every station of the network): was it a wet day across Geneva?
+#   rain_max_station log10(1 + the wettest station's rain): did it fall hard somewhere? (storms are local)
+#   rain_peak_hour   log10(1 + the highest hourly rain at the associated station): how intense
+EXTRA_FEATURE_NAMES = ["rain_area", "rain_max_station", "rain_peak_hour"]
 MIN_HOURS = 20          # a day with fewer hourly values than this is not scored
 
 
-def day_features(flow: IntradaySeries, rain: TimeSeries, base: SeasonalBaseline) -> dict[date, list[float]]:
+def day_features(flow: IntradaySeries, rain: TimeSeries, base: SeasonalBaseline,
+                 area_rain: dict[str, TimeSeries] | None = None,
+                 hourly_rain: IntradaySeries | None = None) -> dict[date, list[float]]:
     hours: dict[date, list[float]] = defaultdict(list)
     for s, v in zip(flow.stamps, flow.values):
         hours[s.date()].append(v)
     rain_d = dict(zip(rain.dates, rain.values))
+    area_d = {k: dict(zip(t.dates, t.values)) for k, t in (area_rain or {}).items()}
+    peak_hour: dict[date, float] = defaultdict(float)
+    if hourly_rain is not None:
+        for s, v in zip(hourly_rain.stamps, hourly_rain.values):
+            peak_hour[s.date()] = max(peak_hour[s.date()], v)
     daily_mean = {d: sum(v) / len(v) for d, v in hours.items() if len(v) >= MIN_HOURS}
 
     out: dict[date, list[float]] = {}
@@ -56,7 +68,7 @@ def day_features(flow: IntradaySeries, rain: TimeSeries, base: SeasonalBaseline)
         logs = [math.log10(max(v, 1e-6)) for v in vals]
         rises = [b - a for a, b in zip(logs, logs[1:])]
         r = lambda k: rain_d.get(d - timedelta(days=k), 0.0)
-        out[d] = [
+        row = [
             base.anomaly(d, mean),
             math.log10(mean) - math.log10(daily_mean[prev]),
             max(vals) / mean,
@@ -65,6 +77,14 @@ def day_features(flow: IntradaySeries, rain: TimeSeries, base: SeasonalBaseline)
             math.log10(1 + r(0) + r(1) + r(2)),
             math.log10(1 + sum(r(k) for k in range(1, 8))),
         ]
+        if area_rain:
+            day_rain = [t[d] for t in area_d.values() if d in t]
+            if not day_rain:
+                continue
+            row += [math.log10(1 + sum(day_rain) / len(day_rain)), math.log10(1 + max(day_rain))]
+        if hourly_rain is not None:
+            row.append(math.log10(1 + peak_hour.get(d, 0.0)))
+        out[d] = row
     return out
 
 
@@ -86,7 +106,9 @@ class DayModel:
         return float((self.train_errors < error).mean())
 
 
-def fit_day_model(flow: IntradaySeries, rain: TimeSeries, train_years: list[int], n_components: int = 3) -> DayModel:
+def fit_day_model(flow: IntradaySeries, rain: TimeSeries, train_years: list[int], n_components: int = 3,
+                  area_rain: dict[str, TimeSeries] | None = None,
+                  hourly_rain: IntradaySeries | None = None) -> DayModel:
     daily = defaultdict(list)
     for s, v in zip(flow.stamps, flow.values):
         daily[s.date()].append(v)
@@ -94,7 +116,7 @@ def fit_day_model(flow: IntradaySeries, rain: TimeSeries, train_years: list[int]
                             sorted(d for d, v in daily.items() if len(v) >= MIN_HOURS),
                             [sum(daily[d]) / len(daily[d]) for d in sorted(d for d, v in daily.items() if len(v) >= MIN_HOURS)])
     base = SeasonalBaseline().fit(flow_daily, train_years)
-    feats = day_features(flow, rain, base)
+    feats = day_features(flow, rain, base, area_rain, hourly_rain)
 
     train = [d for d in feats if d.year in train_years]
     X_raw = np.array([feats[d] for d in train])

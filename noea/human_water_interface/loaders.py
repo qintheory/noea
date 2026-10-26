@@ -44,7 +44,22 @@ STATIONS = {
     "LR_": dict(id=184, name="Laire - Racleret", watercourse="Laire (to confirm)", media=["flow", "temperature"]),
     "BA_": dict(id=26, name="Bachet-de-Pesay (rain)", watercourse=None, media=["rain"]),
     "DD_": dict(id=59, name="David-Dufour (rain)", watercourse=None, media=["rain"]),
+    # the other rain stations of the network (OCEau and MeteoSwiss), all with complete validated daily records 2013-2025
+    "AR_": dict(id=19, name="Aire (rain)", watercourse=None, media=["rain"]),
+    "CE_": dict(id=43, name="Chevrier (rain)", watercourse=None, media=["rain"]),
+    "CGI": dict(id=44, name="Changins, MeteoSwiss (rain)", watercourse=None, media=["rain"]),
+    "CR_": dict(id=55, name="CERN (rain)", watercourse=None, media=["rain"]),
+    "DOL": dict(id=167, name="Dole, MeteoSwiss (rain)", watercourse=None, media=["rain"]),
+    "ER_": dict(id=63, name="Ermitage (rain)", watercourse=None, media=["rain"]),
+    "ES_": dict(id=183, name="Essertines (rain)", watercourse=None, media=["rain"]),
+    "FO_": dict(id=70, name="Maison de la Foret (rain)", watercourse=None, media=["rain"]),
+    "GF_": dict(id=76, name="Grange-Falquet (rain)", watercourse=None, media=["rain"]),
+    "GVE": dict(id=84, name="Geneve-Cointrin, MeteoSwiss (rain)", watercourse=None, media=["rain"]),
+    "LA_": dict(id=90, name="Landecy (rain)", watercourse=None, media=["rain"]),
+    "LC_": dict(id=91, name="Laconnex (rain)", watercourse=None, media=["rain"]),
+    "SA_": dict(id=143, name="Sauverny (rain)", watercourse=None, media=["rain"]),
 }
+RAIN_STATIONS = [k for k, v in STATIONS.items() if v["media"] == ["rain"]]
 # "rain" above is each gauge's associated rain station, as listed on its OCEau station page.
 UNITS = {"flow": "m3/s", "temperature": "degC", "rain": "mm"}
 
