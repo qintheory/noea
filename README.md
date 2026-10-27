@@ -84,16 +84,18 @@ python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data
 
 ```
 noea/
-├── models.py                  shared TimeSeries and XRParameters
-└── climate_pulse/
-    ├── rainfall/              loaders, frameworks, anomaly, mapping, data/
-    └── river/                 loaders, frameworks, yearly, anomaly, mapping, data/
-noea/human_water_interface/    loaders, quality, baselines, anomaly, mapping
-docs/                          introduction and its source
+├── models.py                    shared TimeSeries and XRParameters
+├── climate_pulse/
+│   ├── rainfall/                loaders, frameworks, anomaly, mapping, data/
+│   └── river/                   loaders, frameworks, yearly, anomaly, mapping, data/
+└── human_water_interface/       loaders, quality, baselines, anomaly, mapping, fetch
+demo_*.py                        one or more demos per module
+docs/                            introduction and its source
 ```
 
-Each module's `frameworks.py` is the diagnostic layer; its `mapping.py` is the
-curatorial layer; `anomaly.py` is the learned model.
+In each module, `frameworks.py` is the diagnostic layer (in the Human-Water
+Interface, `quality.py` and `baselines.py`), `anomaly.py` is the learned model,
+and `mapping.py` is the curatorial layer.
 
 ## References
 
