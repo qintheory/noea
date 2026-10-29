@@ -2,9 +2,10 @@
 
 Same visual language as the longitudinal ribbon in Noéa Issue 6 ("River's Biography"): four Rhine
 stations stacked flush on a shared spine, one column per year, height = that year's mean
-discharge relative to the station's own mean. Colour here is the learned anomaly score (PCA
-reconstruction error, one model per station, fit on that station's whole record), so the ribbon
-shows what the model found unusual, not how much water flowed.
+discharge relative to the station's own mean. Colour here is how unusual the year was for its station
+(regime.py: a model of each station's year patterns against its own typical year, fit on its whole
+record; the share of the station's years that are less unusual, pale below the middle, navy for the top
+few percent), so the ribbon shows what the model found unusual, not how much water flowed.
 
 Run from the repository root:  python3 docs/source/make_chart.py docs/source/assets
 """
@@ -17,7 +18,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.cm import ScalarMappable
 from matplotlib.patches import Rectangle
 sys.path.insert(0, ".")
-from noea.climate_pulse.river import build_yearly, fit_anomaly_model, load_rhine_stations
+from noea.climate_pulse.river import build_yearly, fit_regime_model, load_rhine_stations, year_vectors
 
 OUT = sys.argv[1]
 DEEP, TEAL, INK, GREY, GRID = "#00526F", "#5390A2", "#111A20", "#5F6F78", "#EDF1F4"
@@ -29,12 +30,14 @@ cmap = LinearSegmentedColormap.from_list("anom", ["#E3ECF0", "#9FBFCC", "#3D7F96
 Y0, Y1 = 1951, 2020                                  # the Issue 6 ribbon's period
 STATIONS = [("Lustenau", "Lustenau"), ("Basel", "Basel"), ("Koeln", "Köln"), ("Lobith", "Lobith")]   # bottom to top
 data = {}
+rank_u = {}
 for key, ts in load_rhine_stations().items():
-    yearly = build_yearly(ts); model = fit_anomaly_model(yearly)
+    yearly = build_yearly(ts); model = fit_regime_model(year_vectors(ts), key)
     fit = {y.year for y in yearly if y.n_days >= 300}
+    rank_u[key] = dict(model.nll)                                   # ties at the top of the colour scale are broken by the raw score
     mean_all = sum(y.mean_flow for y in yearly if y.year in fit) / len(fit)
-    data[key] = {y.year: (y.mean_flow / mean_all, model.normalized(y.year)) for y in yearly if Y0 <= y.year <= Y1 and y.year in fit}
-top = {k: max(v, key=lambda yr: v[yr][1]) for k, v in data.items()}      # highest-scoring year in the window
+    data[key] = {y.year: (y.mean_flow / mean_all, max(0.0, min(1.0, (model.normalized(y.year) - 0.55) / 0.45))) for y in yearly if Y0 <= y.year <= Y1 and y.year in fit}
+top = {k: max(v, key=lambda yr: (v[yr][1], rank_u[k][yr])) for k, v in data.items()}      # most unusual year in the window
 print({k: (top[k], round(data[k][top[k]][1], 2)) for k in top})
 
 years = list(range(Y0, Y1 + 1))

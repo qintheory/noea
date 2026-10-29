@@ -112,7 +112,7 @@ noea/
 ├── models.py                    shared TimeSeries and XRParameters
 ├── climate_pulse/
 │   ├── rainfall/                loaders, frameworks, anomaly, affect, mapping, data/
-│   └── river/                   loaders, frameworks, yearly, anomaly, mapping, data/
+│   └── river/                   loaders, frameworks, yearly, anomaly, regime, mapping, data/
 └── human_water_interface/       loaders, quality, baselines, anomaly, mapping, fetch
 demo_*.py                        one or more demos per module
 docs/                            interactive page (index.html), introduction deck, and their sources
@@ -121,7 +121,9 @@ docs/                            interactive page (index.html), introduction dec
 In each module, `frameworks.py` is the diagnostic layer (in the Human-Water
 Interface, `quality.py` and `baselines.py`), `anomaly.py` is the learned model,
 and `mapping.py` is the curatorial layer. Hong Kong's `affect.py` sits beside the anomaly
-model: it is learned from the record and feeds the interactive page.
+model: it is learned from the record and feeds the interactive page. The rivers use `regime.py`
+instead of `anomaly.py`: each year is read against the station's own typical year, and the score is the
+share of the station's years that are less unusual.
 
 ## References
 

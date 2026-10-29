@@ -17,7 +17,7 @@ pipeline itself changed, only the data feeding it.
 import json
 
 from noea.climate_pulse.river import (
-    build_profile, build_yearly, fit_anomaly_model,
+    build_profile, build_yearly, fit_regime_model, year_vectors,
     load_alpine_stations, load_rhine_stations, map_series,
 )
 
@@ -36,20 +36,14 @@ def print_comparison(label, stations):
 
 
 def print_year_model(label, stations):
-    """The learned component: one PCA model per station, fit on its own years."""
+    """The learned component: one regime model per station, fit on its own years against its own typical year."""
     print(label)
-    print(f"  {'station':<32}{'fit yrs':>8}{'variance':>10}   most anomalous years (peak date)")
+    print(f"  {'station':<32}{'fit yrs':>8}{'variance':>10}   most unusual years (what departed most)")
     for name, ts in stations.items():
-        yearly = build_yearly(ts)
-        model = fit_anomaly_model(yearly)
-        top = sorted(model.scores, key=model.scores.get, reverse=True)[:3]
-        peaks = []
-        for yr in top:
-            day, _ = max(((d, v) for d, v in zip(ts.dates, ts.values) if d.year == yr),
-                         key=lambda dv: dv[1])
-            peaks.append(f"{yr} ({day:%b %d})")
-        print(f"  {name:<32}{model.n_fit:>8}{sum(model.explained_variance_ratio):>10.0%}   "
-              + ", ".join(peaks))
+        model = fit_regime_model(year_vectors(ts), name)
+        top = sorted(model.unusual, key=lambda y: (-model.unusual[y], y))[:3]
+        print(f"  {name:<32}{model.n_fit:>8}{model.explained:>10.0%}   "
+              + ", ".join(f"{yr} ({model.why(yr)[0]} {model.why(yr)[3]:+.1f} sd)" for yr in top))
     print()
 
 
@@ -75,14 +69,14 @@ def main():
     print_comparison("RHINE MAINSTEM (m3/s) — the lowland/alpine transition", rhine)
     print_comparison("ALPINE HEADWATERS (m3/s) — where the body begins", alpine)
 
-    print_year_model("YEAR-LEVEL ANOMALY MODEL — PCA reconstruction error, one per station", {**rhine, **alpine})
+    print_year_model("YEAR-LEVEL MODEL — probabilistic PCA against each station's typical year, one per station", {**rhine, **alpine})
     print_trend(rhine)
 
     # daily XR mapping, now with each day given the context of its year
     lustenau = rhine["Lustenau"]
     profile = build_profile(lustenau)
     yearly = build_yearly(lustenau)
-    params = map_series(profile, lustenau, yearly=yearly, anomaly=fit_anomaly_model(yearly))
+    params = map_series(profile, lustenau, yearly=yearly, anomaly=fit_regime_model(year_vectors(lustenau), "Lustenau"))
     payload = [p.as_dict() for p in params]
     with open("xr_output.json", "w") as f:
         json.dump(payload, f, indent=2)

@@ -33,6 +33,7 @@ from __future__ import annotations
 from datetime import date
 
 from .anomaly import RiverAnomalyModel
+from .regime import RegimeModel
 from .models import TimeSeries, DiagnosticProfile, XRParameters, YearlyFlow
 
 # how much all-time extremity (regardless of season) can additionally pull valence down
@@ -158,15 +159,16 @@ def map_series(
     discharge_ts: TimeSeries,
     temperature_ts: TimeSeries | None = None,
     yearly: list[YearlyFlow] | None = None,
-    anomaly: RiverAnomalyModel | None = None,
+    anomaly: RiverAnomalyModel | RegimeModel | None = None,
 ) -> list[XRParameters]:
     """Map a whole discharge series to a list of XRParameters (one per day).
 
     Optional temperature series is matched by date where present.
 
-    Pass `yearly` (yearly.build_yearly) and `anomaly` (anomaly.fit_anomaly_model)
-    to give every day the context of its year: the learned anomaly score and the
-    trend-aware deviation from the trailing norm. Omit them and each day is read
+    Pass `yearly` (yearly.build_yearly) and `anomaly` (regime.fit_regime_model, or the
+    earlier anomaly.fit_anomaly_model; both give a 0..1 `normalized(year)`) to give every
+    day the context of its year: how unusual the year was and the trend-aware deviation
+    from the trailing norm. Omit them and each day is read
     on its own, exactly as before.
     """
     # centre both year signals on the station's typical year (see YEAR_*_WEIGHT note)

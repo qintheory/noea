@@ -46,13 +46,17 @@ function nearestValid(i) {
   for (let k = 1; k <= 6; k++) { if (i - k >= 0 && validAt(i - k)) return i - k; if (i + k < G.n && validAt(i + k)) return i + k; }
   return null;
 }
-function colorOf(i) { const v = G.norm[i]; return v === null || v === undefined ? css("--pale") : ramp(v); }
+const unusualText = (u, short) => u >= 0.9999 ? (short ? "its most unusual year" : "the most unusual year in its record") : (short ? "more unusual than " : "more unusual than ") + Math.min(99, Math.round(u * 100)) + "% of " + (short ? "years" : "its years");
+const shade = (u) => P.kind === "river_year" ? Math.max(0, Math.min(1, (u - 0.55) / 0.45)) : u;          // rivers: below the middle of a station's years is ordinary (pale); navy is the top few percent
+function colorOf(i) { const v = G.norm[i]; return v === null || v === undefined ? css("--pale") : ramp(shade(v)); }
 function heldOutStart() { return isDay ? Math.round((Date.UTC(2023, 0, 1) - D0) / 864e5) : null; }
 
 /* ---------- main chart ---------- */
 let plot = null;    // geometry of the last draw, for hit-testing
 function drawMain() {
+  if (P.body) drawRiver();
   if (!$("main").clientWidth) return;
+  if (P.kind === "river_year" && st.step === 1) return drawFramework();
   if (st.view === "ribbon") return drawRibbon();
   if (P.kind === "rain_year" && st.view === "line") return st.step === 0 ? drawRecordEcg() : drawEcg();
   const { x, w, h } = setup($("main"));
@@ -284,12 +288,12 @@ let RIB = null;
 function gIdx(g, yr) { const s = yr - g.labels[0]; return (s >= 0 && s < g._slots) ? g._map[s] : null; }
 function buildRibbon() {
   if (!isDay) {
-    const Y0 = Math.min(...P.groups.map(g => g.labels[0])), Y1 = Math.max(...P.groups.map(g => g.labels[g.n - 1]));
-    const ticks = []; for (let yr = Math.ceil(Y0 / 20) * 20; yr <= Y1; yr += 20) ticks.push({ c: yr - Y0, t: String(yr) });
-    return { ncol: Y1 - Y0 + 1, bands: P.bands, ticks, ref: 1960 - Y0, wide: 2.2,
+    const W = P.windows && P.windows[st.win], Y0 = W && W[2] != null ? W[2] : Math.min(...P.groups.map(g => g.labels[0])), Y1 = W && W[3] != null ? W[3] : Math.max(...P.groups.map(g => g.labels[g.n - 1]));
+    const stp = Y1 - Y0 > 120 ? 20 : 10, ticks = []; for (let yr = Math.ceil(Y0 / stp) * stp; yr <= Y1; yr += stp) ticks.push({ c: yr - Y0, t: String(yr) });
+    return { ncol: Y1 - Y0 + 1, y0: Y0, y1: Y1, bands: P.bands, ticks, ref: 1960 - Y0, wide: 2.2,
       colOf: (g, i) => P.groups[g].labels[i] - Y0,
       cell: (g, c) => { const k = P.groups[g], i = gIdx(k, Y0 + c); if (i === null) return null;
-        return { h: k.rec[i], i, v1: Math.min(1, Math.abs(k.z[st.f][i]) / 4), v2: k.fit[i] ? k.norm[i] : null }; } };
+        return { h: k.rec[i], i, v1: Math.min(1, Math.abs(k.z[st.f][i]) / 4), v2: k.fit[i] ? shade(k.norm[i]) : null }; } };
   }
   const ncol = Math.ceil(P.groups[0].n / 7);
   P.groups.forEach(k => {
@@ -309,12 +313,19 @@ function buildRibbon() {
       return { h: 0.35 + 1.25 * hn, i: w.best, v1: Math.min(1, m / 4), v2: k.norm[w.best] }; } };
 }
 function ribbonStack(q, b, c) {
-  const cells = b.layers.map(g => ({ g, cell: q.sp.cell(g, c) })).filter(L => L.cell);
+  const real = b.layers.map(g => ({ g, cell: q.sp.cell(g, c) }));
+  if (b.lanes) {          // separate streams: each gets its own lane and its own spine, so no continuous body is implied
+    const lh = b.h / b.layers.length;
+    return real.map((L, k) => L.cell ? { g: L.g, cell: L.cell, y0: b.top + lh * (k + 0.5) + L.cell.h * q.unit / 2, y1: b.top + lh * (k + 0.5) - L.cell.h * q.unit / 2 } : null).filter(Boolean);
+  }
+  const any = real.some(L => L.cell), cells = real.map(L => L.cell ? L : (b.fill && any ? { g: L.g, cell: { h: 1, i: null, v1: null, v2: null, ghost: true } } : null)).filter(Boolean);       // a station with no record that year keeps its share as a grey layer, so the river stays one continuous body
   let y = b.spine + cells.reduce((a, L) => a + L.cell.h * q.unit, 0) / 2;
-  return cells.map(L => { const hh = L.cell.h * q.unit, o = { g: L.g, cell: L.cell, y0: y, y1: y - hh }; y -= hh; return o; });
+  return cells.map(L => { const hh = L.cell.h * q.unit, o = { g: L.g, cell: L.cell, ghost: !!L.cell.ghost, y0: y, y1: y - hh }; y -= hh; return o; });
 }
 function cellColor(cell, sp) {
-  if (st.step === 0) return ramp(0.15 + 0.6 * Math.min(1, cell.h / sp.wide));
+  if (cell.ghost) return "rgba(116,116,116,0.30)";          // no record: a neutral grey, clearly not a shade of the blue scale
+  if (st.step === 0) { if (P.kind !== "river_year") return ramp(0.15 + 0.6 * Math.min(1, cell.h / sp.wide));
+    const t = Math.max(0, Math.min(1, (cell.h - 0.35) / 1.3)); return ramp(t * t * (3 - 2 * t)); }          // rivers: a dry year (0.35 of the station's average) is the palest blue, a wet one (1.65 and over) deep navy, with an S-curve so the middle separates too
   if (st.step === 1) return ramp(0.08 + 0.92 * cell.v1);
   return cell.v2 === null ? css("--pale") : ramp(0.08 + 0.92 * cell.v2);
 }
@@ -322,47 +333,215 @@ function drawRibbon() {
   const { x, w, h } = setup($("main")); RIB = RIB || buildRibbon(); const sp = RIB;
   const muted = css("--muted"), rule = css("--rule"), ink = css("--ink"), gold = css("--gold");
   const small = w < 560, ml = small ? 92 : 128, mr = 12, mt = 28, mb = 26, pw = w - ml - mr, bw = pw / sp.ncol;
-  const nb = sp.bands.length, gap = nb > 1 ? 36 : 0, avail = h - mt - mb - 14 - gap, share = nb > 1 ? [0.6, 0.4] : [1];
+  const nb = sp.bands.length, gap = nb > 1 ? 36 : 0, avail = h - mt - mb - 14 - gap, share = nb > 1 ? [0.52, 0.48] : [1];
   let yy = mt + 14; const bands = sp.bands.map((b, k) => { const bh = avail * share[k], o = Object.assign({}, b, { top: yy, h: bh, spine: yy + bh / 2 }); yy += bh + gap; return o; });
-  const q = { ml, pw, bw, sp, bands, unit: Infinity }; plot = { rib: q };
-  bands.forEach(b => { let mx = 0; for (let c = 0; c < sp.ncol; c++) mx = Math.max(mx, b.layers.reduce((a, g) => { const k = sp.cell(g, c); return a + (k ? k.h : 0); }, 0)); q.unit = Math.min(q.unit, (b.h - 6) / mx); });
+  const q = { ml, pw, bw, sp, bands, unit: Infinity }; plot = { rib: q }; q.labels = [];
+  bands.forEach(b => { let mx = 0; for (let c = 0; c < sp.ncol; c++) { const cs = b.layers.map(g => sp.cell(g, c)), n = cs.filter(Boolean).length;
+      mx = Math.max(mx, b.lanes ? Math.max(0, ...cs.map(k => k ? k.h : 0)) : cs.reduce((a, k) => a + (k ? k.h : 0), 0) + (b.fill && n ? (cs.length - n) : 0)); }
+    q.unit = Math.min(q.unit, b.lanes ? (b.h / b.layers.length - 6) / mx : (b.h - 6) / mx); });
+  if (P.kind === "river_year") { $("bk1").style.height = Math.max(3, Math.round(q.unit)) + "px"; $("bk2").style.height = Math.max(6, Math.round(2 * q.unit)) + "px"; }          // the key's sample bars, at the scale of the real ones
   x.textBaseline = "middle"; x.textAlign = "left"; x.fillStyle = muted;
-  x.fillText(st.step === 0 ? (small ? "Height: " + (isDay ? "the week's median flow (log)" : "the year's mean flow, relative") : isDay ? "Height and shade: the week's median flow, log scale, within each gauge's own range" : "Height and shade: the year's mean flow relative to the station's own average year")
-    : st.step === 1 ? F[st.f].label + (small ? "" : " · colour is distance from typical") : small ? "Colour: anomaly score · gold: highest" : "Colour is the anomaly score; gold outlines the highest-scoring " + P.unit + " of each " + (isDay ? "gauge" : "station"), 4, 12);
+  x.fillText(st.step === 0 ? (small ? "Height: " + (isDay ? "the week's median flow (log)" : "the year's mean flow, relative") : isDay ? "Height and shade: the week's median flow, log scale, within each gauge's own range" : "Height and colour: the year's mean flow relative to the station's own average year")
+    : st.step === 1 ? F[st.f].label + (small ? "" : " · colour is distance from typical") : small ? (P.kind === "river_year" ? "Colour: how unusual · gold: most unusual" : "Colour: anomaly score · gold: highest") : P.kind === "river_year" ? "Colour is how unusual the year is for its station; gold outlines each station's most unusual year" : "Colour is the anomaly score; gold outlines the highest-scoring " + P.unit + " of each " + (isDay ? "gauge" : "station"), 4, 12);
   const wbar = Math.max(1.2, bw * 0.86);
   bands.forEach(b => {
     if (b.name) { x.fillStyle = muted; x.font = "700 12px " + FONT; x.textAlign = "left"; x.fillText(b.name, 4, b.top - 7); x.font = "12px " + FONT; }
-    x.strokeStyle = rule; x.lineWidth = 1; x.beginPath(); x.moveTo(ml, Math.round(b.spine) + 0.5); x.lineTo(ml + pw, Math.round(b.spine) + 0.5); x.stroke();
+    x.strokeStyle = rule; x.lineWidth = 1; x.beginPath();
+    if (b.lanes) b.layers.forEach((g, k) => { const yy = Math.round(b.top + (b.h / b.layers.length) * (k + 0.5)) + 0.5; x.moveTo(ml, yy); x.lineTo(ml + pw, yy); }); else { x.moveTo(ml, Math.round(b.spine) + 0.5); x.lineTo(ml + pw, Math.round(b.spine) + 0.5); }
+    x.stroke();
     for (let c = 0; c < sp.ncol; c++) ribbonStack(q, b, c).forEach(L => { x.fillStyle = cellColor(L.cell, sp); x.fillRect(ml + (c + 0.5) * bw - wbar / 2, L.y1 + 0.3, wbar, Math.max(0.5, L.y0 - L.y1 - 0.6)); });
     // station names at the left, at each layer's height in a reference column
-    let rc = sp.ref; for (let k = 0; k < sp.ncol; k++) { const c = rc + (k % 2 ? 1 : -1) * Math.ceil(k / 2); if (c >= 0 && c < sp.ncol && ribbonStack(q, b, c).length === b.layers.length) { rc = c; break; } }
+    let rc = sp.ref; for (let k = 0; k < sp.ncol; k++) { const c = rc + (k % 2 ? 1 : -1) * Math.ceil(k / 2); if (c >= 0 && c < sp.ncol && ribbonStack(q, b, c).length === b.layers.length && ribbonStack(q, b, c).every(l => !l.ghost)) { rc = c; break; } }
     x.textAlign = "right"; x.font = (small ? "11px " : "12px ") + FONT;
-    ribbonStack(q, b, rc).forEach(L => { const k = P.groups[L.g]; x.fillStyle = L.g === st.g ? ink : muted; x.fillText(k.short || k.name, ml - 8, (L.y0 + L.y1) / 2); });
+    ribbonStack(q, b, rc).forEach(L => { const k = P.groups[L.g], yc = (L.y0 + L.y1) / 2, on = L.g === st.g || L.g === st.hoverG; x.fillStyle = on ? ink : muted; if (on) x.font = "700 " + (small ? "11px " : "12px ") + FONT; x.fillText(k.short || k.name, ml - 8, yc); x.font = (small ? "11px " : "12px ") + FONT; q.labels.push({ g: L.g, y0: yc - 11, y1: yc + 11 }); });
     x.font = "12px " + FONT;
   });
   // time axis
   x.strokeStyle = muted; x.beginPath(); x.moveTo(ml, h - mb + 0.5); x.lineTo(ml + pw, h - mb + 0.5); x.stroke();
   x.fillStyle = muted; x.textAlign = "center"; sp.ticks.forEach(t => { if (small && !isDay && (+t.t) % 40) return; const xx = ml + (t.c + 0.5) * bw; x.beginPath(); x.moveTo(xx, h - mb); x.lineTo(xx, h - mb + 4); x.stroke(); x.fillText(t.t, xx, h - mb + 16); });
-  const outline = (g, i, col, lw, alpha) => { const c = sp.colOf(g, i); for (const b of bands) { const L = ribbonStack(q, b, c).find(l => l.g === g); if (L) { x.globalAlpha = alpha; x.strokeStyle = col; x.lineWidth = lw;
+  const outline = (g, i, col, lw, alpha) => { const c = sp.colOf(g, i); for (const b of bands) { const L = ribbonStack(q, b, c).find(l => l.g === g && !l.ghost); if (L) { x.globalAlpha = alpha; x.strokeStyle = col; x.lineWidth = lw;
     x.strokeRect(ml + (c + 0.5) * bw - Math.max(wbar, 3) / 2 - 1, L.y1 - 0.5, Math.max(wbar, 3) + 2, L.y0 - L.y1 + 1); x.globalAlpha = 1; return { b, c }; } } return null; };
   if (st.step === 2) { const used = []; x.textAlign = "center"; x.font = "700 12px " + FONT;
-    P.groups.forEach((k, g) => { const i = k.top[0], r = outline(g, i, gold, 1.8, 1); if (!r) return; const xx = ml + (r.c + 0.5) * bw, tx = label(i, k);
+    P.groups.forEach((k, g) => { const i = P.windows ? topIn(k, 1)[0] : k.top[0]; if (i === undefined) return; const r = outline(g, i, gold, 1.8, 1); if (!r) return; const xx = ml + (r.c + 0.5) * bw, tx = label(i, k);
       const near = used.filter(u => u.b === r.b && Math.abs(u.x - xx) < 70); if (near.some(u => u.t === tx)) return;
       used.push({ b: r.b, x: xx, t: tx }); x.fillStyle = gold; x.fillText(tx, Math.min(Math.max(xx, ml + 30), ml + pw - 30), r.b.top - 7 - 14 * near.length); });
     x.font = "12px " + FONT; }
   if (st.hover !== null && st.hoverG !== null && !(st.hoverG === st.g && st.hover === st.sel)) outline(st.hoverG, st.hover, ink, 1.2, 0.6);
   outline(st.g, st.sel, ink, 2, 1);
 }
+/* ---------- river body (Issue 6, in miniature): the gauges as one branching river that flows down the page, coloured for one year ---------- */
+function bodyLayout() { const ix = {}; P.groups.forEach((k, g) => { ix[k.id] = g; }); return { nodes: P.body.nodes.map(n => Object.assign({ g: ix[n.id] }, n)), edges: P.body.edges.map(e => [ix[e[0]], ix[e[1]]]) }; }
+function topIn(k, n) { RIB = RIB || buildRibbon(); return k.norm.map((v, i) => [v, i]).filter(([v, i]) => v !== null && k.labels[i] >= RIB.y0 && k.labels[i] <= RIB.y1).sort((p, q) => q[0] - p[0]).slice(0, n).map(p => p[1]); }
+let bodyPlot = null;
+function drawRiver() {
+  const cv = $("river"); if (!cv || !P.body || !cv.clientWidth) return;
+  const { x, w, h } = setup(cv); RIB = RIB || buildRibbon(); const sp = RIB, T = bodyLayout();
+  if (st.by === undefined) st.by = G.labels[st.sel];
+  st.by = Math.max(sp.y0, Math.min(sp.y1, st.by));
+  $("bodyRange").min = sp.y0; $("bodyRange").max = sp.y1; $("bodyRange").value = st.by; $("bodyYear").textContent = st.by;
+  const muted = css("--muted"), ink = css("--ink"), gold = css("--gold"), small = w < 560;
+  const ml = small ? 86 : 170, mr = small ? 86 : 170, mt = 60, mb = 34, pw = w - ml - mr, ph = h - mt - mb, mx = Math.max(...P.groups.map(k => k.mean));
+  const pos = {}; T.nodes.forEach(n => { const k = P.groups[n.g]; pos[n.g] = { x: ml + n.x * pw, y: mt + n.y * ph, lw: 2 + 15 * Math.sqrt(k.mean / mx), cell: sp.cell(n.g, st.by - sp.y0), n, spine: n.x === 0.5 }; });
+  const col = (p) => p.cell && p.cell.v2 !== null ? ramp(0.08 + 0.92 * p.cell.v2) : css("--pale");
+  x.lineCap = "round";
+  T.edges.forEach(([a, b], k) => { const A = pos[a], B = pos[b], ok = A.cell && B.cell && A.cell.v2 !== null && B.cell.v2 !== null, spine = A.spine && B.spine, w0 = spine ? A.lw : Math.max(1.6, A.lw * 0.45), w1 = spine ? B.lw : A.lw, S = bodyStrip(A, B, k, w0, w1), gr = x.createLinearGradient(A.x, A.y, B.x, B.y + 0.01);
+    gr.addColorStop(0, col(A)); gr.addColorStop(1, col(B)); x.globalAlpha = ok ? 0.94 : 0.55; x.fillStyle = gr;
+    x.beginPath(); S.L.forEach((p, i) => i ? x.lineTo(p.x, p.y) : x.moveTo(p.x, p.y)); for (let i = S.R.length - 1; i >= 0; i--) x.lineTo(S.R[i].x, S.R[i].y); x.closePath(); x.fill();
+    if (!spine) { x.beginPath(); x.arc(A.x, A.y, w0 / 2, 0, 6.2832); x.fill(); }          // a source starts round
+    x.globalAlpha = 1; });
+  x.textBaseline = "middle"; const hits = [];
+  T.nodes.forEach(n => { const p = pos[n.g], k = P.groups[n.g], i = p.cell ? p.cell.i : null, r = p.lw / 2 + 5, left = n.side === "l";
+    x.fillStyle = col(p); x.strokeStyle = css("--bg"); x.lineWidth = 2.5; x.beginPath(); x.arc(p.x, p.y, r, 0, 6.2832); x.fill(); x.stroke();
+    const ring = (rr, c, lw, al) => { x.globalAlpha = al; x.strokeStyle = c; x.lineWidth = lw; x.beginPath(); x.arc(p.x, p.y, rr, 0, 6.2832); x.stroke(); x.globalAlpha = 1; };
+    if (i !== null && i === topIn(k, 1)[0]) ring(r + 4, gold, 2, 1);
+    if (st.bhoverG === n.g && n.g !== st.g) ring(r + 4, ink, 1.2, 0.6);
+    if (n.g === st.g) ring(r + 4, ink, 2, 1);
+    const tx = p.x + (left ? -(r + 12) : r + 12); x.textAlign = left ? "right" : "left";
+    x.font = (n.g === st.g ? "700 " : "400 ") + (small ? "11px " : "12px ") + FONT; x.fillStyle = n.g === st.g ? ink : muted; x.fillText(k.short || k.name, tx, p.y - 8);
+    x.font = (small ? "10px " : "11px ") + FONT; x.fillStyle = muted;
+    x.fillText(i === null ? "no record this year" : (k.fit[i] ? unusualText(k.norm[i], true) : "not fitted"), tx, p.y + 8);
+    hits.push({ g: n.g, x: p.x, y: p.y, r, i }); });
+  bodyPlot = hits;
+  x.textAlign = "left"; x.fillStyle = ink; x.font = "400 22px " + css("--title"); x.fillText(String(st.by), 4, 24);
+  x.font = "11px " + FONT; x.fillStyle = muted; x.fillText("Flows downstream, top to bottom. Not to scale: width is each station's usual flow.", 4, h - 12);
+}
+/* a branch from A down to B: it swings in a meander that is different for every branch and settles to vertical at both ends, widening as it flows */
+function bodyPoint(A, B, k, t) {
+  const dx = B.x - A.x, dy = B.y - A.y, spine = A.spine && B.spine, e = t * t * (3 - 2 * t), sg = k % 2 ? 1 : -1;
+  const waves = spine ? 1.15 : 1.4 + 0.3 * (k % 3), amp = (spine ? 0.06 : 0.3 + 0.05 * (k % 3)) * Math.abs(dy), s2 = Math.pow(Math.sin(Math.PI * t), 2);
+  return { x: A.x + dx * e + sg * amp * Math.sin(2 * Math.PI * waves * t + 0.7 * k) * s2, y: A.y + dy * t };
+}
+function bodyStrip(A, B, k, w0, w1) {
+  const N = 72, L = [], R = [];
+  for (let i = 0; i <= N; i++) { const t = i / N, p = bodyPoint(A, B, k, t), q = bodyPoint(A, B, k, Math.min(1, t + 0.004)), o = bodyPoint(A, B, k, Math.max(0, t - 0.004));
+    let dx = q.x - o.x, dy = q.y - o.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d; const e = t * t * (3 - 2 * t), hw = (w0 + (w1 - w0) * e) / 2;
+    L.push({ x: p.x - dy * hw, y: p.y + dx * hw }); R.push({ x: p.x + dy * hw, y: p.y - dx * hw }); }
+  return { L, R };
+}
+function bodyHit(px, py) {
+  const q = bodyPlot; if (!q) return null; let best = null, bd = 1e9;
+  q.forEach(n => { const d = Math.hypot(px - n.x, py - n.y); if (d < n.r + 8 && d < bd) { bd = d; best = n; } });
+  if (!best) return null;
+  const k = P.groups[best.g], nm = k.short || k.name;
+  return best.i === null ? { g: best.g, i: null, tip: nm + " · no record in " + st.by } : { g: best.g, i: best.i, tip: nm + " · " + st.by + " · " + (k.fit[best.i] ? unusualText(k.norm[best.i]) + whyText(best.g, best.i) : "not fitted") };
+}
+let bodyTimer = 0;
+function stopBody() { if (bodyTimer) { clearInterval(bodyTimer); bodyTimer = 0; } const b = $("bodyPlay"); if (b) b.textContent = "Play"; }
+function setBodyYear(y) {
+  RIB = RIB || buildRibbon(); st.by = Math.max(RIB.y0, Math.min(RIB.y1, y)); const i = gIdx(G, st.by);
+  if (i !== null) select(i); else drawMain();
+}
+function setWindow(wi) {
+  st.win = wi; RIB = null; stopBody(); RIB = buildRibbon();
+  document.querySelectorAll("#views .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(k === wi)));
+  st.by = Math.max(RIB.y0, Math.min(RIB.y1, st.by === undefined ? G.labels[st.sel] : st.by));
+  let i = gIdx(G, st.by); if (i === null || !G.fit[i]) i = topIn(G, 1)[0];
+  setGroup(st.g, i === undefined ? 0 : i); st.by = G.labels[st.sel]; drawMain();
+}
+function playBody() {
+  if (bodyTimer) return stopBody(); RIB = RIB || buildRibbon();
+  if (st.by >= RIB.y1) setBodyYear(RIB.y0);
+  $("bodyPlay").textContent = "Pause";
+  bodyTimer = setInterval(() => { if (!$("river").clientWidth || st.by >= RIB.y1) return stopBody(); setBodyYear(st.by + 1); }, 380);
+}
+/* ---------- the four frameworks of Issue 6: one scientific graph for each of the six measures, at every station (rivers, Diagnostics step) ---------- */
+const FRAMES = [
+  { fw: "Pulse", graph: "the annual flow", note: "Pulse, the annual flow. In each panel a bar is a year's mean flow as a multiple of that station's average year. The grey band holds the middle 80% of the station's years, the dashed line is its typical year, and the dark bar is the chosen year." },
+  { fw: "Pulse", graph: "the flood peak", note: "Pulse, the flood peak. A bar is the year's highest day as a multiple of the highest day of that station's typical year. The grey band holds the middle 80% of its years, the dashed line is the typical year, and the dark bar is the chosen year." },
+  { fw: "Pulse", graph: "the low flow", note: "Pulse, the low flow. A bar is the year's lowest 7-day mean flow as a multiple of that station's typical low flow: how close the river came to running dry. The grey band holds the middle 80% of its years, and the dark bar is the chosen year." },
+  { fw: "Personality", graph: "the flow duration curve", note: "Personality, the flow duration curve. For each share of the days, the flow that was exceeded that often, as a multiple of the station's average. A steep curve is a flashy, spiky river; a flat one is buffered by groundwater and lakes. The grey band holds the middle 80% of its years; the dark line is the chosen year." },
+  { fw: "Memory", graph: "the recession curve", note: "Memory, the recession curve. How fast the flow falls back in the 40 days after the year's highest day, as a share of that peak, on a log scale. Slow means the river holds its water. The grey band holds the middle 80% of its years; the dark line is the chosen year." },
+  { fw: "Breath", graph: "the seasonal cycle", note: "Breath, the seasonal cycle. The mean flow of each month as a multiple of the station's average. The seasonal shift is winter water against summer water compared with the typical year: snowmelt shows as a high summer. The grey band holds the middle 80% of its years; the dark line is the chosen year." },
+];
+const quantile = (a, p) => { if (!a.length) return null; const t = (a.length - 1) * p / 100, l = Math.floor(t), u = Math.ceil(t); return a[l] + (a[u] - a[l]) * (t - l); };
+function frameLayout(w) { const n = P.bands[st.fg || 0].layers.length, cols = w < 560 ? 1 : 2, rows = Math.ceil(n / cols), plotH = 128, rowH = 18 + plotH + 24 + 14; return { cols, bl: 0, rows, plotH, rowH, top: 50, height: 50 + rows * rowH + 4 }; }
+function drawFramework() {
+  const { x, w } = setup($("main")); RIB = RIB || buildRibbon();
+  const f = st.f, L = frameLayout(w), gap = 16, pw0 = (w - (L.cols - 1) * gap) / L.cols;
+  const ink = css("--ink"), muted = css("--muted"), rule = css("--rule"), pale = css("--pale"), mid = css("--c1"), deep = css("--c4"), ok = (v) => v !== null && v !== undefined;
+  x.textBaseline = "middle"; x.textAlign = "left"; x.fillStyle = ink; x.font = "700 13px " + FONT; x.fillText(FRAMES[f].fw + " · " + FRAMES[f].graph + " · " + (st.by !== undefined ? st.by : label(st.sel)), 4, 14);
+  x.font = "12px " + FONT; x.fillStyle = muted; x.fillText("one panel per station · number: the year's value" + (F[f].unit ? " (" + F[f].unit + ")" : "") + " · band: the middle 80% of its years", 4, 33);
+  const panels = [];
+  const tick = (px, py, t, al) => { x.textAlign = al; x.fillText(t, px, py); };
+  P.bands[st.fg || 0].layers.forEach((g, pi) => {
+    const k = P.groups[g], c = pi % L.cols, rr = Math.floor(pi / L.cols), X0 = c * (pw0 + gap), Yb = L.top + rr * L.rowH;
+    const Y0 = Yb + L.bl, sel = g === st.g, ml = 30, pw = pw0 - ml - 14, py0 = Y0 + 20, ph = L.plotH, py1 = py0 + ph;
+    const fit = k.labels.map((_, j) => j).filter(j => k.fit[j]), yi = gIdx(k, st.by);
+    x.font = (sel ? "700 " : "400 ") + "12px " + FONT; x.fillStyle = sel ? ink : muted; x.textAlign = "left"; x.fillText(k.short || k.name, X0 + 2, Y0 + 8);
+    const val = yi !== null ? k.raw[f][yi] : null;
+    if (ok(val)) { x.font = "11px " + FONT; x.fillStyle = muted; x.textAlign = "right"; x.fillText(fmt(val), X0 + pw0 - 12, Y0 + 8); }
+    x.strokeStyle = sel ? ink : rule; x.lineWidth = sel ? 1.4 : 1; x.strokeRect(X0 + ml + 0.5, py0 + 0.5, pw, ph);
+    x.font = "10px " + FONT; x.fillStyle = muted;
+    const lineOf = (xs, ys, col, lw) => { x.strokeStyle = col; x.lineWidth = lw; x.beginPath(); let pen = false; ys.forEach((v, q) => { if (!ok(v)) { pen = false; return; } if (!pen) { x.moveTo(xs[q], v); pen = true; } else x.lineTo(xs[q], v); }); x.stroke(); };
+    const bandOf = (xs, lo, hi) => { x.fillStyle = pale; x.globalAlpha = 0.6; x.beginPath(); lo.forEach((v, q) => q ? x.lineTo(xs[q], v) : x.moveTo(xs[q], v)); for (let q = hi.length - 1; q >= 0; q--) x.lineTo(xs[q], hi[q]); x.closePath(); x.fill(); x.globalAlpha = 1; x.fillStyle = muted; };
+    const yTicks = (ticks, yf, ft) => { x.textAlign = "right"; x.strokeStyle = rule; x.lineWidth = 1; ticks.forEach(t => { const yy = Math.round(yf(t)) + 0.5; if (yy > py0 && yy < py1) { x.beginPath(); x.moveTo(X0 + ml, yy); x.lineTo(X0 + ml + pw, yy); x.stroke(); } x.fillText(ft(t), X0 + ml - 4, yf(t)); }); };
+    const xTicks = (ticks, xf, ft) => { x.textAlign = "center"; ticks.forEach(t => x.fillText(ft(t), xf(t), py1 + 11)); };
+    const cols = (arr, q) => fit.map(j => k[arr][j]).filter(Boolean).map(r => r[q]).filter(ok).sort((p, r) => p - r);
+    let ser = null;
+    if (!fit.length) { panels.push({ g, X0, Y0, w: pw0, h: 20 + ph + 24, ser }); return; }
+    if (f <= 2) {
+      const idx = fit.filter(j => k.labels[j] >= RIB.y0 && k.labels[j] <= RIB.y1), vs = idx.map(j => k.raw[f][j]).filter(ok), all = fit.map(j => k.raw[f][j]).filter(ok).sort((p, r) => p - r);
+      const hi = Math.max(...(vs.length ? vs : [1]), quantile(all, 90)) * 1.1, bw = pw / Math.max(1, RIB.y1 - RIB.y0 + 1), xv = (j) => X0 + ml + (k.labels[j] - RIB.y0 + 0.5) * bw, yv = (v) => py1 - v / hi * ph, s = niceStep(hi, 3), tk = []; for (let t = 0; t <= hi; t += s) tk.push(t);
+      yTicks(tk, yv, (t) => fmt(t, s < 1 ? 1 : 0));
+      x.fillStyle = pale; x.globalAlpha = 0.6; x.fillRect(X0 + ml, yv(quantile(all, 90)), pw, yv(quantile(all, 10)) - yv(quantile(all, 90))); x.globalAlpha = 1;
+      idx.forEach(j => { const v = k.raw[f][j]; if (!ok(v)) return; x.fillStyle = j === yi ? deep : mid; x.fillRect(xv(j) - Math.max(0.5, bw * 0.4), yv(v), Math.max(0.9, bw * 0.8), py1 - yv(v)); });
+      x.strokeStyle = ink; x.setLineDash([3, 3]); x.lineWidth = 1; x.beginPath(); x.moveTo(X0 + ml, yv(quantile(all, 50))); x.lineTo(X0 + ml + pw, yv(quantile(all, 50))); x.stroke(); x.setLineDash([]);
+      const stp = RIB.y1 - RIB.y0 > 120 ? 50 : 20, yt = []; for (let yr = Math.ceil(RIB.y0 / stp) * stp; yr <= RIB.y1; yr += stp) yt.push(yr);
+      x.fillStyle = muted; xTicks(yt, (yr) => X0 + ml + (yr - RIB.y0 + 0.5) * bw, String);
+      ser = { xs: idx.map(j => ({ j, x: xv(j) })), bw, x0: X0 + ml, pw };
+    } else if (f === 3 || f === 4) {
+      const key = f === 3 ? "fdc" : "recess", ps = f === 3 ? P.frame.fdc_p : P.frame.recess_lag, n_ = ps.length, p10 = ps.map((_, q) => quantile(cols(key, q), 10)), p50 = ps.map((_, q) => quantile(cols(key, q), 50)), p90 = ps.map((_, q) => quantile(cols(key, q), 90)), yr = yi !== null ? k[key][yi] : null;
+      const okb = ps.map((_, q) => ok(p10[q]) && ok(p90[q])), lo0 = Math.min(...p10.filter(ok), ...((yr || []).filter(ok)), f === 4 ? 1 : 1e9), hi0 = Math.max(...p90.filter(ok), ...((yr || []).filter(ok)), 0);
+      const lo = f === 3 ? lo0 * 0.85 : Math.max(0.02, lo0 * 0.8), hi = f === 3 ? hi0 * 1.15 : 1.1, ly = (v) => py1 - (Math.log(Math.max(v, lo)) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)) * ph, xv = (v) => X0 + ml + v / (f === 3 ? 100 : 40) * pw, xs = ps.map(xv);
+      yTicks((f === 3 ? [0.1, 0.2, 0.5, 1, 2, 5, 10] : [0.05, 0.1, 0.2, 0.5, 1]).filter(t => t >= lo && t <= hi), ly, (t) => fmt(t));
+      xTicks(f === 3 ? [0, 50, 100] : [0, 20, 40], xv, (t) => f === 3 ? t + "%" : t + "d");
+      bandOf(xs.filter((_, q) => okb[q]), p10.filter((_, q) => okb[q]).map(ly), p90.filter((_, q) => okb[q]).map(ly));
+      lineOf(xs, p50.map(v => ok(v) ? ly(v) : null), mid, 1.3); if (yr) lineOf(xs, yr.map(v => ok(v) ? ly(v) : null), deep, 2.2);
+    } else {
+      const mo = yi !== null ? k.monthly[yi] : null, p10 = [...Array(12)].map((_, q) => quantile(cols("monthly", q), 10)), p50 = [...Array(12)].map((_, q) => quantile(cols("monthly", q), 50)), p90 = [...Array(12)].map((_, q) => quantile(cols("monthly", q), 90));
+      const hi = Math.max(...p90.filter(ok), ...((mo || []).filter(ok))) * 1.12, yv = (v) => py1 - v / hi * ph, xv = (q) => X0 + ml + (q + 0.5) / 12 * pw, xs = [...Array(12)].map((_, q) => xv(q)), s = niceStep(hi, 3), tk = []; for (let t = 0; t <= hi; t += s) tk.push(t);
+      yTicks(tk, yv, (t) => fmt(t, s < 1 ? 1 : 0)); xTicks([0, 3, 6, 9], xv, (q) => MONTHS[q]);
+      bandOf(xs, p10.map(yv), p90.map(yv)); lineOf(xs, p50.map(yv), mid, 1.3); if (mo) lineOf(xs, mo.map(v => ok(v) ? yv(v) : null), deep, 2.2);
+    }
+    if (yi === null) { x.font = "italic 11px " + FONT; x.fillStyle = muted; x.textAlign = "center"; x.fillText("no record in " + st.by, X0 + ml + pw / 2, py0 + ph / 2); }
+    if (st.hoverG === g && !sel) { x.strokeStyle = ink; x.globalAlpha = 0.5; x.lineWidth = 1.2; x.strokeRect(X0 + ml + 0.5, py0 + 0.5, pw, ph); x.globalAlpha = 1; }
+    panels.push({ g, X0, Y0, w: pw0, h: 20 + ph + 24, ser });
+  });
+  plot = { frame: { panels } };
+}
+function frameHit(px, py) {
+  const q = plot && plot.frame; if (!q) return null; const p = q.panels.find(a => px >= a.X0 && px <= a.X0 + a.w && py >= a.Y0 && py <= a.Y0 + a.h); if (!p) return null;
+  const k = P.groups[p.g], f = st.f; let i = gIdx(k, st.by);
+  if (p.ser) { let bd = 1e9; p.ser.xs.forEach(b => { const d = Math.abs(px - b.x); if (d < bd) { bd = d; i = b.j; } }); }
+  if (i === null || i === undefined) return { g: p.g, i: null, tip: (k.short || k.name) + " · no record in " + st.by };
+  const v = k.raw[f][i], z = k.z[f][i];
+  return { g: p.g, i, tip: (k.short || k.name) + " · " + k.labels[i] + " · " + F[f].label + " " + fmt(v) + (F[f].unit ? " " + F[f].unit : "") + " (" + (z >= 0 ? "+" : "") + z.toFixed(1) + " sd from its typical year)" };
+}
+function kindOf(g, i) {          // the measure that departs most from the station's typical year, and which way (words come from the data)
+  const k = P.groups[g]; if (!k.z || !k.fit[i]) return ""; let b = -1, bv = -1; k.z.forEach((c, j) => { if (c[i] !== null && Math.abs(c[i]) > bv) { bv = Math.abs(c[i]); b = j; } });
+  return b < 0 || !F[b].words ? "" : F[b].words[k.z[b][i] >= 0 ? 1 : 0];
+}
+function flowCtx(g, i) {          // the year's flow in plain words, so a score is never read without it
+  const v = P.groups[g].rec[i]; if (v === null || v === undefined) return "";
+  return "mean flow " + v.toFixed(2) + " × its average" + (v < 0.9 ? " (below average)" : v > 1.1 ? " (above average)" : "");
+}
+function whyText(g, i) { const c = flowCtx(g, i), kd = kindOf(g, i); return (c ? "\n" + c : "") + (kd ? "\nmost unusual for: " + kd : ""); }
+function stationAt(px, py) { const q = plot && plot.rib; if (!q || !q.labels || px < 0 || px > q.ml) return null; return q.labels.find(l => py >= l.y0 && py <= l.y1) || null; }
+function stationInfo(g) {
+  const k = P.groups[g];
+  return [k.name, k.info, "Record " + k.labels[0] + "–" + k.labels[k.n - 1] + " · " + k.summary.n_fit + " fitted years", "Usual flow " + fmt(k.mean) + " m³/s (mean of the daily flow)"].filter(Boolean).join("\n");
+}
 function ribbonHit(px, py) {
   const q = plot && plot.rib; if (!q || px < q.ml || px > q.ml + q.pw) return null;
   const c = Math.floor((px - q.ml) / q.bw); if (c < 0 || c >= q.sp.ncol) return null;
   let best = null, bd = 1e9;
   q.bands.forEach(b => { if (py < b.top - 6 || py > b.top + b.h + 6) return;
-    ribbonStack(q, b, c).forEach(L => { const d = (py >= L.y1 && py <= L.y0) ? 0 : Math.min(Math.abs(py - L.y0), Math.abs(py - L.y1)); if (d < bd) { bd = d; best = { g: L.g, i: L.cell.i }; } }); });
+    ribbonStack(q, b, c).forEach(L => { if (L.ghost) return; const d = (py >= L.y1 && py <= L.y0) ? 0 : Math.min(Math.abs(py - L.y0), Math.abs(py - L.y1)); if (d < bd) { bd = d; best = { g: L.g, i: L.cell.i }; } }); });
   return bd < 16 ? best : null;
 }
 function hitAt(e) {
   const r = $("main").getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (P.kind === "river_year" && st.step === 1) return frameHit(px, py);
   if (st.view === "ribbon") return ribbonHit(px, py);
   if (P.kind === "rain_year" && st.view === "line") return st.step > 0 ? ecgHit(px) : recHit(px);
   if (!plot || !plot.pw || px < plot.ml || px > plot.ml + plot.pw) return null;
@@ -376,18 +555,18 @@ function tipText(hit) {
   let t = (st.view === "ribbon" && P.groups.length > 1 ? (g.short || g.name) + " · " : "") + label(i, g) + " · ";
   if (st.step === 0) t += isDay ? fmt(g.rec[i]) + " m³/s" : fmt(g.rec[i]);
   else if (st.step === 1) t += fmt(g.raw[st.f][i]) + " (" + (g.z[st.f][i] >= 0 ? "+" : "") + g.z[st.f][i].toFixed(1) + "σ)";
-  else t += isDay ? "score " + fmt(g.score[i], 1) : (g.fit[i] ? "score " + g.norm[i].toFixed(2) + ", rank " + g.rank[i] : "not fitted");
+  else t += isDay ? "score " + fmt(g.score[i], 1) : (g.fit[i] ? (P.kind === "river_year" ? unusualText(g.norm[i]) + whyText(hit.g, i) : "score " + g.norm[i].toFixed(2)) : "not fitted");
   if (isDay && st.view === "ribbon") t += " · highest day of the week";
   return t;
 }
 function viewNotes() { return {
-  ribbon: [isDay ? "One column per week; each gauge is a layer, stacked flush on a shared spine as in the Issue 6 Rhine ribbon. Click a week to inspect its highest-scoring day." : "One column per year, as in the Issue 6 ribbon: each station is a layer stacked flush on a shared spine. The upper ribbon is the Rhine mainstem, the lower one the alpine headwaters.",
+  ribbon: [isDay ? "One column per week; each gauge is a layer, stacked flush on a shared spine as in the Issue 6 Rhine ribbon. Click a week to inspect its highest-scoring day." : "One column per year, as in the Issue 6 ribbon: each station is a layer stacked flush on a shared spine. The upper ribbon is the Rhine mainstem; below it each of the four alpine headwaters has a lane of its own.",
            "Colour shows how far each " + P.unit + " is from typical on the chosen diagnostic, in either direction.",
-           isDay ? "Colour is the week's highest daily score. A single storm day shows up instead of being averaged away." : "Colour is the anomaly score, scaled within each station. Gold outlines each station's highest-scoring year."]
+           isDay ? "Colour is the week's highest daily score. A single storm day shows up instead of being averaged away." : P.kind === "river_year" ? "Colour is how unusual the year is for its station: pale for an ordinary year, navy for the top few percent of that station's years. It says how far, not which way. Gold outlines each station's most unusual year." : "Colour is the anomaly score, scaled within each station. Gold outlines each station's highest-scoring year."]
 }; }
 function sizeCanvas() {
   const c = $("main"), w = c.parentElement.clientWidth;
-  c.style.height = (st.view === "ribbon" ? (P.bands ? (w < 560 ? 430 : 480) : 320) : 320) + "px";
+  c.style.height = (P.kind === "river_year" && st.step === 1 ? frameLayout(w).height : st.view === "ribbon" ? (P.bands ? (w < 560 ? 430 : 480) : 320) : 320) + "px";
 }
 function setView(v) {
   st.view = v; st.hover = null; st.hoverG = null;
@@ -395,7 +574,7 @@ function setView(v) {
   sizeCanvas(); setStep(st.step);
 }
 function selectHit(hit) {
-  if (!hit) return;
+  if (!hit || hit.i === null || hit.i === undefined) return;
   if (hit.g !== st.g) setGroup(hit.g, hit.i); else select(hit.i);
 }
 
@@ -428,12 +607,15 @@ function renderUnit() {
     $("uNote").textContent = held ? "Held out: the model never saw this day when it was fitted."
       : dateOf(i).getUTCFullYear() < 2014 ? "2013 was not part of the fit: scored by inference." : "This day was part of the fitting years (2014–2022).";
   } else if (G.fit[i]) {
-    line = "Anomaly score " + G.norm[i].toFixed(2) + " of 1 · rank " + G.rank[i] + " of " + G.summary.n_fit + " fitted years";
-    typical = G.norm[i] < 0.2; $("uNote").hidden = true;
+    line = P.kind === "river_year" ? (G.norm[i] >= 0.9999 ? "The most unusual year in this station's record" : "More unusual than " + Math.min(99, Math.round(G.norm[i] * 100)) + "% of this station's years") : "Anomaly score " + G.norm[i].toFixed(2) + ", on a scale from 0 (" + (P.groups.length > 1 ? "this station's" : "this record's") + " most typical year) to 1 (its most unusual)";
+    typical = P.kind === "river_year" ? G.norm[i] < 0.6 : G.norm[i] < 0.2; $("uNote").hidden = true;
   } else { line = "Anomaly score " + fmt(G.score[i], 1) + " (raw), not on the 0–1 scale"; typical = false; $("uNote").hidden = false; $("uNote").textContent = note || "Scored, not fitted."; }
   $("uScore").textContent = line;
   const j = sh.indexOf(Math.max(...sh)), f = F[j];
-  $("uWhy").textContent = typical
+  const zmax = G.z.map(c => Math.abs(c[i] || 0)), jz = zmax.indexOf(Math.max(...zmax));
+  $("uWhy").textContent = P.kind === "river_year" && G.fit[i]
+    ? (typical ? "Within the ordinary range for this station. The largest departure is " : "Most unusual for: ") + F[jz].words[G.z[jz][i] >= 0 ? 1 : 0] + ". " + F[jz].label + " is " + fmt(G.raw[jz][i]) + (F[jz].unit ? " " + F[jz].unit : "") + ", " + Math.abs(G.z[jz][i]).toFixed(1) + " standard deviations " + (G.z[jz][i] >= 0 ? "above" : "below") + " the station's typical year."
+    : typical
     ? "This " + P.unit + " fits the typical pattern: no single diagnostic stands out."
     : "Largest misfit: " + f.label.toLowerCase() + ", " + Math.round(sh[j] * 100) + "% of the score. " + f.desc + " Here it is " + fmt(G.raw[j][i]) + (f.unit ? " " + f.unit : "") + ", " + Math.abs(G.z[j][i]).toFixed(1) + " standard deviations " + (G.z[j][i] >= 0 ? "above" : "below") + " typical.";
   const k = G.facts ? G.facts[i] : null;
@@ -445,6 +627,7 @@ function renderUnit() {
   } else {
     $("uFacts").textContent = "Mean flow " + fmt(G.rec[i]) + " m³/s · rain " + fmt(G.rain[i], 1) + " mm that day";
   }
+  $("shareHead").textContent = P.kind === "river_year" ? "Share of the departure" : "Share of misfit";
   $("rows").innerHTML = F.map((ff, jj) => {
     const z = G.z[jj][i], zp = Math.max(-3, Math.min(3, z)) / 3 * 50;
     const left = zp >= 0 ? 50 : 50 + zp, wid = Math.abs(zp);
@@ -508,58 +691,78 @@ function drawDetail() {
 
 /* ---------- controls ---------- */
 function setStep(s) {
-  st.step = s;
+  st.step = s; sizeCanvas();
   document.querySelectorAll(".step").forEach((b, k) => b.setAttribute("aria-selected", String(k === s)));
   $("stepText").textContent = P.steps[s][1];
   const rich = st.view !== "line";
-  $("featBox").hidden = s !== 1; $("legend").hidden = !(s === 2 || (rich && s === 1)); $("sumLine").hidden = s !== 2;
-  $("lgA").textContent = "typical"; $("lgB").textContent = s === 1 ? "far from typical" : "most unusual";
-  $("viewNote").textContent = rich ? viewNotes()[st.view][s] : "";
+  const yr = P.kind === "river_year" && st.view === "ribbon" && s !== 1;
+  $("featBox").hidden = s !== 1; $("legend").hidden = !(s === 2 || (rich && s === 1 && P.kind !== "river_year") || yr); $("sumLine").hidden = s !== 2;
+  $("lgA").textContent = yr && s === 0 ? "low flow" : P.kind === "river_year" && s === 2 ? "an ordinary year" : "typical"; $("lgB").textContent = yr && s === 0 ? "high flow" : s === 1 ? "far from typical" : P.kind === "river_year" ? "among its most unusual years" : "most unusual";
+  $("barKey").hidden = !yr;
+  if (P.kind === "river_year") $("groupBox").hidden = s !== 1;
+  if (P.windows) $("viewBox").hidden = s === 1 && st.f > 2;          // the window only matters for the graphs drawn over the years
+  if (yr) { $("bkText").textContent = s === 0 ? "Height and colour both show the year's mean flow, for visual effect: tall and navy for a high-flow year, short and pale for a low-flow year, measured against that station's own average. Grey: no record that year."
+    : "Bar height: the year's mean flow as a multiple of that station's own average, so 1.0 is an average year. " + (s === 1 ? "Colour: how far the year is from typical on the chosen diagnostic." : "Colour: how unusual the year is for this station, from pale (an ordinary year) to navy (among its most unusual, the top few percent). It does not say which way, so hover a bar to see the year's flow and what makes it unusual. Gold outline: the station's most unusual year.") + " Grey: no record that year.";
+    document.querySelector("#barKey .bkscale").style.display = s === 0 ? "none" : ""; }
+  $("viewNote").textContent = P.kind === "river_year" && s === 1 ? FRAMES[st.f].note : rich ? viewNotes()[st.view][s] + (st.view === "ribbon" && P.bands && P.bands.some(b => b.fill) ? " The Rhine keeps its full thickness as one continuous river; the alpine streams are separate lanes, not one body." : "") : "";
   const sm = G.summary, vr = Math.round(sm.variance * 100) + "%";
   $("sumLine").textContent = isDay
     ? sm.components + " components keep " + vr + " of the variance in " + sm.n_fit.toLocaleString("en-GB") + " fitting days. Of the " + sm.n_test.toLocaleString("en-GB") + " held-out days, " + (sm.test_above_p95 * 100).toFixed(1) + "% score above the training 95th percentile (5% expected if nothing had changed) and " + (sm.test_above_p99 * 100).toFixed(1) + "% above the 99th (1% expected)."
     : sm.components + " components keep " + vr + " of the variance in the " + sm.n_fit + " fitted years" + (P.groups.length > 1 ? " of this station." : ".");
   document.querySelectorAll("#feats .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(k === st.f)));
   $("main").setAttribute("aria-label", P.steps[s][0] + ": " + P.steps[s][1]);
-  $("hint").textContent = "Click a " + (st.view === "ring" ? "filament" : st.view === "ribbon" ? (isDay ? "week" : "layer") : P.unit) + " to inspect it. Arrow keys step by one " + P.unit + (isDay ? ", Shift for a month." : ", Shift for ten.");
+  $("hint").textContent = P.kind === "river_year" && s === 1 ? "Pick a measure above. Choose the stations above. Click a panel to select that station" + (st.f <= 2 ? ", or a bar to choose that year" : "") + "; the year also follows the slider on the river." : (P.kind === "river_year" ? "Hover a station name for its details; click it to choose that station. " : "") + "Click a " + (st.view === "ring" ? "filament" : st.view === "ribbon" ? (isDay ? "week" : "layer") : P.unit) + " to inspect it. Arrow keys step by one " + P.unit + (isDay ? ", Shift for a month." : ", Shift for ten.");
   drawMain(); renderUnit();
+}
+function markFrameChips() { document.querySelectorAll("#groups .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(P.kind === "river_year" ? k === (st.fg || 0) : false))); }
+function setFrameGroup(k) {
+  st.fg = k; markFrameChips();
+  if (!P.bands[k].layers.includes(st.g)) { const g2 = P.bands[k].layers[0]; let i = gIdx(P.groups[g2], st.by); if (i === null || !P.groups[g2].fit[i]) i = topIn(P.groups[g2], 1)[0]; setGroup(g2, i === undefined ? 0 : i); }
+  else { sizeCanvas(); drawMain(); }
 }
 function setGroup(g, keep) {
   st.g = g; G = P.groups[g]; st.hover = null; st.hoverG = null; st.sel = keep !== undefined ? keep : G.top[0];
   $("gNote").hidden = !G.note; $("gNote").textContent = G.note || "";
-  document.querySelectorAll("#groups .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(k === g)));
+  if (P.kind === "river_year") { const bi = P.bands.findIndex(b => b.layers.includes(g)); if (bi >= 0) st.fg = bi; markFrameChips(); st.by = G.labels[st.sel]; }
+  else document.querySelectorAll("#groups .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(k === g)));
   renderFlagged(); setStep(st.step);
 }
-function select(i) { if (i === null || i === undefined) return; st.sel = i; if (heart && heart.year() !== i) heart.go(i, true, true); drawMain(); renderUnit(); }
+function select(i) { if (i === null || i === undefined) return; st.sel = i; if (P.kind === "river_year") st.by = G.labels[i]; if (heart && heart.year() !== i) heart.go(i, true, true); drawMain(); renderUnit(); }
 function renderFlagged() {
-  $("flagLabel").textContent = isDay ? "Highest-scoring days in the held-out years (2023–2025)" : "Highest-scoring " + P.unit_plural + " in this record";
-  $("flagged").innerHTML = G.top.map(i => '<button class="chip" data-i="' + i + '">' + label(i) + '</button>').join("");
+  $("flagLabel").textContent = isDay ? "Highest-scoring days in the held-out years (2023–2025)" : "Highest-scoring " + P.unit_plural + (P.windows ? " in this window" : " in this record");
+  $("flagged").innerHTML = (P.windows ? topIn(G, 6) : G.top).map(i => '<button class="chip" data-i="' + i + '">' + label(i) + '</button>').join("");
   document.querySelectorAll("#flagged .chip").forEach(b => b.onclick = () => select(+b.dataset.i));
 }
 function start(data) {
   P = data; prepare();
-  st = { g: 0, step: 0, f: 0, sel: 0, hover: null, hoverG: null, view: (P.views || [["line"]])[0][0] };
-  G = P.groups[0]; F = P.features; RIB = null; plot = null; heartMount();
+  st = { g: 0, step: 0, f: 0, sel: 0, win: 0, fg: 0, hover: null, hoverG: null, bhoverG: null, view: (P.views || [["line"]])[0][0] };
+  G = P.groups[0]; F = P.features; RIB = null; plot = null; stopBody(); bodyPlot = null; $("riverBox").hidden = !P.body; if (P.body) $("riverNote").textContent = P.body.note || ""; heartMount();
   if (!window.NOEA_SITE) document.title = P.title;
   $("eyebrow").textContent = P.eyebrow; $("title").textContent = P.title; $("deck").textContent = P.deck;
   $("steps").innerHTML = P.steps.map((s, k) => '<button class="step" role="tab" data-k="' + k + '"><b>' + (k + 1) + '</b>' + s[0] + '</button>').join("");
   document.querySelectorAll(".step").forEach(b => b.onclick = () => setStep(+b.dataset.k));
   $("feats").innerHTML = F.map((f, k) => '<button class="chip" title="' + f.desc.replace(/"/g, "&quot;") + '" data-k="' + k + '">' + f.label + '</button>').join("");
   document.querySelectorAll("#feats .chip").forEach(b => b.onclick = () => { st.f = +b.dataset.k; setStep(1); });
-  $("groupBox").hidden = P.groups.length <= 1;
+  $("groupBox").hidden = P.groups.length <= 1 || P.kind === "river_year";
   if (P.groups.length > 1) {
-    $("groupBox").hidden = false; $("groupLabel").textContent = isDay ? "Gauge" : "Station";
-    $("groups").innerHTML = P.groups.map((g, k) => '<button class="chip" data-k="' + k + '">' + g.name + '</button>').join("");
-    document.querySelectorAll("#groups .chip").forEach(b => b.onclick = () => setGroup(+b.dataset.k));
+    $("groupBox").hidden = P.kind === "river_year"; $("groupLabel").textContent = isDay ? "Gauge" : "Station";
+    if (P.kind === "river_year") { $("groupLabel").textContent = "Stations"; $("groups").innerHTML = P.bands.map((b, k) => '<button class="chip" data-k="' + k + '">' + b.name + '</button>').join("");
+      document.querySelectorAll("#groups .chip").forEach(b => b.onclick = () => setFrameGroup(+b.dataset.k)); }
+    else { $("groups").innerHTML = P.groups.map((g, k) => '<button class="chip" data-k="' + k + '">' + g.name + '</button>').join("");
+      document.querySelectorAll("#groups .chip").forEach(b => b.onclick = () => setGroup(+b.dataset.k)); }
   }
   $("limits").innerHTML = P.limits.map(t => "<li>" + t + "</li>").join("");
   $("method").textContent = "Method: " + P.method;
   $("source").textContent = "Data: " + P.source;
   const VIEWS = P.views || [["line", "Timeline"]];
-  $("viewBox").hidden = VIEWS.length <= 1;
-  if (VIEWS.length > 1) { $("viewBox").hidden = false;
+  $("viewBox").hidden = VIEWS.length <= 1 && !P.windows;
+  if (P.windows) { $("viewBox").hidden = false; $("viewLabel").textContent = "Window";
+    $("views").innerHTML = P.windows.map((v, k) => '<button class="chip" data-v="' + k + '" aria-pressed="' + (k === 0) + '">' + v[1] + '</button>').join("");
+    document.querySelectorAll("#views .chip").forEach((b, k) => b.onclick = () => setWindow(k)); }
+  else if (VIEWS.length > 1) { $("viewLabel").textContent = "View"; $("viewBox").hidden = false;
     $("views").innerHTML = VIEWS.map(v => '<button class="chip" data-v="' + v[0] + '">' + v[1] + '</button>').join("");
     document.querySelectorAll("#views .chip").forEach(b => b.onclick = () => setView(b.dataset.v)); }
+  $("bodyPlay").onclick = playBody; $("bodyRange").oninput = (e) => { stopBody(); setBodyYear(+e.target.value); };
   sizeCanvas();
   setGroup(0);
 }
@@ -567,14 +770,27 @@ function boot() {
   if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", () => { if (P && $("main").clientWidth) { drawMain(); drawDetail(); } });
   const c = $("main"), tip = $("tip");
   c.addEventListener("pointermove", (e) => {
+    const r0 = c.getBoundingClientRect(), lab = st.view === "ribbon" && P.kind === "river_year" ? stationAt(e.clientX - r0.left, e.clientY - r0.top) : null;
+    if (lab) { st.hover = null; st.hoverG = lab.g; drawMain(); c.style.cursor = "pointer"; tip.style.whiteSpace = "pre"; tip.textContent = stationInfo(lab.g); tip.hidden = false;
+      tip.style.left = Math.max(e.clientX - r0.left + 150, 150) + "px"; tip.style.top = Math.max(e.clientY - r0.top - 10, 24) + "px"; return; }
+    c.style.cursor = ""; tip.style.whiteSpace = "pre";
     const hit = hitAt(e); st.hover = hit ? hit.i : null; st.hoverG = hit ? hit.g : null; drawMain();
     if (!hit) { tip.hidden = true; return; }
     const r = c.getBoundingClientRect();
     tip.textContent = tipText(hit); tip.hidden = false;
     tip.style.left = Math.min(Math.max(e.clientX - r.left, 70), r.width - 70) + "px"; tip.style.top = Math.max(e.clientY - r.top - 10, 24) + "px";
   });
-  c.addEventListener("pointerleave", () => { st.hover = null; st.hoverG = null; tip.hidden = true; drawMain(); });
-  c.addEventListener("click", (e) => selectHit(hitAt(e)));
+  c.addEventListener("pointerleave", () => { st.hover = null; st.hoverG = null; tip.hidden = true; tip.style.whiteSpace = ""; drawMain(); });
+  c.addEventListener("click", (e) => {
+    const r = c.getBoundingClientRect(), lab = st.view === "ribbon" && P.kind === "river_year" ? stationAt(e.clientX - r.left, e.clientY - r.top) : null;
+    if (lab) { let i = gIdx(P.groups[lab.g], st.by); if (i === null || !P.groups[lab.g].fit[i]) i = topIn(P.groups[lab.g], 1)[0]; if (i !== undefined) setGroup(lab.g, i); return; }
+    selectHit(hitAt(e)); });
+  const rc = $("river"), rtip = $("riverTip");
+  rc.addEventListener("pointermove", (e) => { if (!P || !P.body) return; const r = rc.getBoundingClientRect(), hit = bodyHit(e.clientX - r.left, e.clientY - r.top); st.bhoverG = hit ? hit.g : null; drawRiver();
+    if (!hit) { rtip.hidden = true; return; } rtip.style.whiteSpace = "pre"; rtip.textContent = hit.tip; rtip.hidden = false; rtip.style.left = Math.min(Math.max(e.clientX - r.left, 70), r.width - 70) + "px"; rtip.style.top = Math.max(e.clientY - r.top - 10, 24) + "px"; });
+  rc.addEventListener("pointerleave", () => { st.bhoverG = null; rtip.hidden = true; drawRiver(); });
+  rc.addEventListener("click", (e) => { const r = rc.getBoundingClientRect(); selectHit(bodyHit(e.clientX - r.left, e.clientY - r.top)); });
+  rc.addEventListener("keydown", (e) => { const k = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!k) return; e.preventDefault(); stopBody(); setBodyYear(st.by + k * (e.shiftKey ? 10 : 1)); });
   c.addEventListener("keydown", (e) => {
     const k = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0; if (!k) return; e.preventDefault();
     let i = st.sel + k * (e.shiftKey ? (isDay ? 30 : 10) : 1); i = Math.min(G.n - 1, Math.max(0, i));

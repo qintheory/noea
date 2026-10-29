@@ -16,7 +16,8 @@ Rules for the copy (keep them when editing):
        curatorial layer  mapping.py: how a result should feel; designed, not measured
        valence           pleasant to unpleasant   (Russell, 1980)
        arousal           calm to activated        (Russell, 1980)
-       unusual year      a year with a high anomaly score (PCA reconstruction error)
+       unusual year      a year that departs far from its own record's typical year (rainfall: a high PCA
+                         reconstruction error; rivers: regime.py, the share of the station's years that are less unusual)
 
   3. Slides carry the written claim; SPEAKER_NOTES carry the spoken version and the
      caveats. They should agree, not repeat each other word for word.
@@ -82,15 +83,15 @@ LAYER_CURATORIAL = ("Curatorial layer", "Designed", [
 
 # ---- 6. machine learning --------------------------------------------------------
 ML_TITLE = "Machine learning finds unusual years"
-ML_SUBTITLE = "Unsupervised: learn what a typical year looks like for each record, then score how badly each year fits."
-ML_CALLOUT_BOLD = "Outlined: each station's highest-scoring year, 1951–2020."
+ML_SUBTITLE = "Unsupervised: learn what a typical year looks like for each record, then score how unusual each year is."
+ML_CALLOUT_BOLD = "Outlined: each station's most unusual year, 1951–2020."
 ML_CALLOUT_REST = "The model was never told what happened in any of them."
-ML_CHART_ALT = ("The Rhine ribbon redrawn with colour showing the model's anomaly score per year; the highest-scoring "
-                "year at Lustenau (2005), Basel (1972), Köln and Lobith (1993) is outlined")
-ML_METHOD = ("Method: PCA reconstruction error, one model per station. 1993: Christmas Rhine flood (Köln, Lobith). "
-             "2005: Alpine floods (Lustenau). 1972: a drought year in Issue 6.")
-ML_LIMIT = ("Limit: it flags unusual combinations, not extremes. 1976 drought: 3rd of 70 years at Lustenau, "
-            "187th of 208 at Köln. 1995 Köln flood: 101st.")
+ML_CHART_ALT = ("The Rhine ribbon redrawn with colour showing how unusual each year was for its station; the most unusual year at "
+                "Lustenau (2005), Basel (2018), and Köln and Lobith (1952) is outlined")
+ML_METHOD = ("Method: a probabilistic PCA of each year against its station's own typical year, one model per station. "
+             "2005: Alpine floods (Lustenau). 2018: the summer drought (Basel). 1952: much winter water, a dry summer (Köln, Lobith).")
+ML_LIMIT = ("Limit: it says how unusual, not which way. Of 30 documented floods and droughts, 22 score 0.70 or higher; a summer-only "
+            "drought such as 2003 reads as ordinary at Köln (0.43). Those events were looked at while the model was built.")
 
 # ---- 7. the end -----------------------------------------------------------------
 END_TITLE = "The end result is how people respond"
@@ -121,13 +122,16 @@ SPEAKER_NOTES = {
         "two PCA factors, intensity and wetness, plus the anomaly score, ranked within the record. Seven of eight checks fixed in advance "
         "pass; valence and arousal correlate at minus 0.71, just past the limit. None of it has been tested with people."),
     6: ("Machine learning has one job so far: finding unusual years. For each record an unsupervised model learns what a "
-        "typical year looks like, then scores how badly each year fails to fit. The ribbon is the one from Issue 6, but coloured by "
-        "the model's score instead of by discharge. At Lustenau the highest-scoring year is the August 2005 flood and at Köln "
-        "and Lobith the Christmas 1993 flood; none was told to the model. At Basel it is 1972, a drought year in Issue 6. "
-        "It is not a drought detector, though: 1976 ranks third of 70 at Lustenau but 187th of 208 at Köln, and the 1995 Köln "
-        "flood ranks 101st. In Hong Kong the same model ranks 1926 seventh and 2023 nineteenth of 134 complete years, "
-        "and the 1963 drought 98th. It flags unusual combinations of features, not every extreme. "
-        "On the Aare at Thun, not shown, the highest year is the May 1999 Swiss flood."),
+        "typical year looks like, the rhythm of its months, its floods and its low flows, then scores how unusual each year is, as the "
+        "share of that station's own years that are less unusual. The ribbon is the one from Issue 6, but coloured by that score instead "
+        "of by discharge. At Lustenau the most unusual year is the August 2005 flood, and at Basel it is 2018, the summer drought. "
+        "At Köln and Lobith it is 1952, a year with much winter water and a dry summer, and none of this was told to the model. "
+        "It is not a perfect event detector. Checked against 30 documented floods and droughts at six stations, 22 score 0.70 or higher: "
+        "Basel 1972 scores 0.95, the 2005 Alpine floods about 0.99 at Lustenau and Thun, the 1976 drought 0.81 at Köln. A summer-only "
+        "drought such as 2003 reads as ordinary at Köln, at 0.43, and the 1993 Köln flood scores 0.68. Those events were looked at while "
+        "the model was built, so this is a sanity check, not a validation. The earlier model scored only how badly a year's combination "
+        "of ratios failed to reconstruct, and left the 1976 drought looking ordinary at Köln. Hong Kong rainfall still uses that earlier "
+        "kind of score, and the score does not say which way a year departed."),
     7: ("Noéa connects machine intelligence to natural intelligence: a model learns the rhythm of a river or rainfall record "
         "and flags the years that break it. What nobody has tested is whether people feel what the system intends. "
         "That has to be studied in human labs, with HCI methods. That is the research."),
@@ -148,7 +152,10 @@ REFERENCES = [
 #   limit was |r| <= 0.70). 1926: valence -0.99, arousal 0.97; 2023: -0.95, 0.92; 1963: -0.48, 0.24. Relative ranks, not measurements.
 # * The XRParameters table (size, glow, texture, tempo) is deliberately NOT on the slides: it is unconfirmed
 #   scaffolding (see README), not from the Issues, and glow (luminosity) is a constant 0.5 without temperature data.
-# * PCA anomaly model, 2 components, one model per record. Fitted years only: Hong Kong 1926 ranks 7th
+# * Rivers (regime.py, checked 2026-10-29): 22 of 30 documented floods and droughts score 0.70 or higher across six stations
+#   (Basel 1972 0.95, Basel 2018 0.99, Köln 1947 0.96, Lustenau 2005 0.99, Köln 1976 0.81; Köln 2003 0.43, Lobith 2003 0.39). Most
+#   unusual year in 1951-2020: Lustenau 2005, Basel 2018, Köln 1952, Lobith 1952. The events were looked at while the model was built.
+# * Hong Kong rainfall still uses the PCA anomaly model, 2 components. Fitted years only: Hong Kong 1926 ranks 7th
 #   and 2023 19th of 134; the 1963 drought ranks 98th (checked 2026-10-17).
 # * Anomaly ribbon (slide 6), fitted-year ranks, checked 2026-10-17: highest in 1951-2020 is Lustenau 2005, Basel 1972
 #   (Basel's all-time highest is 1881, outside the window), Köln 1993, Lobith 1993. 1976 ranks 3rd of 70 (Lustenau),

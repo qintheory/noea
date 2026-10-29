@@ -71,6 +71,7 @@ footer p { margin: 0 0 6px; }
 @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } .chart canvas { height: 280px; } th.hide-sm, td.hide-sm { display: none; } }
 @media (prefers-reduced-motion: no-preference) { .step, .chip { transition: background-color .15s, color .15s, border-color .15s; } }
 
+.pulsebar[hidden] { display: none; }
 .pulsebar { display: flex; align-items: center; gap: 16px; margin: 4px 0 12px; }
 .pulsebar button { font: 400 12px/1 var(--title); letter-spacing: .16em; text-transform: uppercase; padding: 11px 16px; border: 1px solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); cursor: pointer; min-width: 92px; }
 .pulsebar button:hover { background: var(--ink); color: var(--bg); }
@@ -78,6 +79,11 @@ footer p { margin: 0 0 6px; }
 .pulsebar output { font: 400 15px/1 var(--title); letter-spacing: .08em; min-width: 4ch; text-align: right; }
 
 .heart { margin: 0 0 30px; }
+.barkey { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 14px; margin: 8px 0 6px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.barkey .bkscale { display: inline-flex; align-items: flex-end; white-space: nowrap; color: var(--ink); font: 400 12px var(--title); }
+.barkey .bkscale i { display: inline-block; width: 8px; margin: 0 4px 0 10px; background: var(--c2); }
+#river { display: block; width: 100%; height: clamp(460px, 62vw, 580px); }
+#river:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .hv { position: relative; }
 .hv .h2d, .hv .h3d { display: block; width: 100%; --hpad: 140px; height: calc(clamp(320px, 50vw, 540px) + var(--hpad)); }
 .hv [hidden] { display: none; }

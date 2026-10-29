@@ -24,10 +24,17 @@ from noea.climate_pulse.rainfall import build_profile, fit_anomaly_model as fit_
 from noea.climate_pulse.rainfall.affect import fit_affect_model
 from noea.climate_pulse.rainfall.anomaly import FEATURE_NAMES as RAIN_FEATS, MIN_DAYS_FOR_FIT as RAIN_MIN, _feature_row as rain_row
 from noea.climate_pulse.river import build_yearly, fit_anomaly_model as fit_river, load_alpine_stations, load_rhine_stations
+from noea.climate_pulse.river.regime import DESCRIPTORS as REG_DESC, fit_regime_model, year_vectors
 from noea.climate_pulse.river.anomaly import FEATURE_NAMES as RIVER_FEATS, MIN_DAYS_FOR_FIT as RIVER_MIN, _feature_row as river_row
 
 HERE = Path(__file__).parent
 SHORT = {"Weisse Lütschine-Zweilütschinen": "Weisse Lütschine", "Reuss-Andermatt": "Reuss", "Aare-Brienzwiler": "Aare, Brienzwiler", "Aare-Thun": "Aare, Thun"}
+STATION_INFO = {"Lustenau": "Rhine at Höchster Brücke, Austria · GRDC · catchment 6,301 km²", "Basel": "Rhine at Basel, Rheinhalle, Switzerland · GRDC · catchment 35,897 km²",
+                "Koeln": "Rhine at Köln, Germany · GRDC · catchment 144,232 km²", "Lobith": "Rhine at Lobith, the Netherlands · GRDC · catchment 160,800 km²",
+                "Weisse Lütschine-Zweilütschinen": "Weisse Lütschine at Zweilütschinen, Switzerland · FOEN", "Reuss-Andermatt": "Reuss at Andermatt, Switzerland · FOEN",
+                "Aare-Brienzwiler": "Aare at Brienzwiler, Switzerland · FOEN", "Aare-Thun": "Aare at Thun, Switzerland · FOEN"}
+FDC_P = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99]               # the share of days a flow is exceeded, for the flow duration curve
+RECESS_LAG = list(range(0, 41, 2))                                               # days after the year's highest day, for the recession curve
 TRAIN = list(range(2014, 2023))
 
 
@@ -95,9 +102,9 @@ def rainfall():
     passed = sum(af.checks.values()); c = af.correlations
     limits = [
         f"The model flags unusual combinations of features, not extremes. 1931 is among the top-scoring years with a peak of only {ys[idx[1931]].r_value:.0f} mm, "
-        f"while 1926, which holds the largest single day ({ys[idx[1926]].r_value:.0f} mm), ranks {ordinal(rk[idx[1926]])} of {n_fit} and 2023 ranks {ordinal(rk[idx[2023]])}. "
-        f"The 1963 drought ranks {ordinal(rk[idx[1963]])}.",
-        f"Valence and arousal (the corner map) are relative to this record: ranks among its {af.n_fit} fitted years. They combine two PCA factors learned from the data, intensity and wetness, with the anomaly score, and agree with it (arousal r = {c['arousal~anomaly']:+.2f}, valence r = {c['valence~anomaly']:+.2f}). "
+        f"while 1926, which holds the largest single day ({ys[idx[1926]].r_value:.0f} mm), scores {norm[idx[1926]]:.2f} and 2023 scores {norm[idx[2023]]:.2f}, on a scale where 1 is the most unusual year of the record. "
+        f"The 1963 drought scores {norm[idx[1963]]:.2f}.",
+        f"Valence and arousal (the corner map) are relative to this record: each year is placed against its {af.n_fit} fitted years. They combine two PCA factors learned from the data, intensity and wetness, with the anomaly score, and agree with it (arousal r = {c['arousal~anomaly']:+.2f}, valence r = {c['valence~anomaly']:+.2f}). "
         f"They pass {passed} of {len(af.checks)} consistency checks fixed in advance; valence and arousal share about half their variance (r = {c['valence~arousal']:+.2f}). No viewers rated anything, so this is a hypothesis about affect, not a measurement.",
         "There are no data for 1940–1946, so the record has 135 years rather than 142. 2025 is a partial year (the data end in January): it is scored by the fitted model and never shaped it.",
         "Years with missing days are totalled and summarised over the days that exist (n_days is between 268 and 299 for 55 of the 135 years).",
@@ -119,12 +126,10 @@ def rivers():
     groups = []
     for name, ts in stations:
         ts = ts.clean()
-        yearly = build_yearly(ts); model = fit_river(yearly)
+        yearly = build_yearly(ts); yv = year_vectors(ts); rm = fit_regime_model(yv, name); yvd = {v.year: v for v in yv}
         by_year = defaultdict(list)
         for d, v in zip(ts.dates, ts.values):
             by_year[d.year].append((d, v))
-        rows = [river_row(y) for y in yearly]
-        X, res = explain(model.scaler, model.pca, rows)
         fit = [1 if y.n_days >= RIVER_MIN else 0 for y in yearly]
         mean_all = float(np.mean([y.mean_flow for y, f in zip(yearly, fit) if f]))
         weekly = []
@@ -134,33 +139,55 @@ def rivers():
                 wk[min((d.timetuple().tm_yday - 1) // 7, 51)].append(v)
             weekly.append([r(np.mean(wk[w]) / mean_all, 3) if wk.get(w) else None for w in range(52)])
         med = [r(float(np.median([w[k] for w, f in zip(weekly, fit) if f and w[k] is not None])), 3) for k in range(52)]
-        score = [model.scores[y.year] for y in yearly]
-        rk, order = rank_of(score, fit)
+        fdc, recess, monthly = [], [], []                                          # the three other graphs of Issue 6: flow duration (Personality), recession (Memory), seasonal cycle (Breath)
+        for y, f_ in zip(yearly, fit):
+            ds = by_year[y.year]; vals = [v for _, v in ds]; n_ = len(vals)
+            if not f_ or n_ < 300:
+                fdc.append(None); recess.append(None); monthly.append(None); continue
+            sv = sorted(vals, reverse=True); k0 = max(range(n_), key=lambda j: vals[j]); pk = vals[k0]; mm = defaultdict(list)
+            for d_, v_ in ds: mm[d_.month].append(v_)
+            fdc.append([r(sv[min(n_ - 1, int(n_ * p / 100))] / mean_all, 3) for p in FDC_P])
+            recess.append([r(vals[k0 + L] / pk, 3) if k0 + L < n_ and pk > 0 else None for L in RECESS_LAG])
+            monthly.append([r(float(np.mean(mm[m])) / mean_all, 3) if mm.get(m) else None for m in range(1, 13)])
+        names = list(REG_DESC)                                                       # wetness, flood, low, personality, memory, season: the plain descriptors of the regime model
+        shown = {"wetness": lambda y: r(y.mean_flow / mean_all, 3), "flood": lambda y: r(yvd[y.year].highest / rm.typical_highest, 3), "low": lambda y: r(yvd[y.year].lowest / rm.typical_lowest, 3),
+                 "personality": lambda y: r(yvd[y.year].fdc_slope, 3), "memory": lambda y: r(yvd[y.year].recession_k, 4), "season": lambda y: r(rm.raw[y.year]["season"], 3)}
+        zs = [[r(rm.descriptors[y.year][n], 2) for y in yearly] for n in names]
+        order = sorted((i for i, f_ in enumerate(fit) if f_), key=lambda i: -rm.unusual[yearly[i].year])
         groups.append(dict(
-            id=name, name=name.replace("Koeln", "Köln").replace("-", " – "), short=SHORT.get(name, name.replace("Koeln", "Köln")), n=len(yearly), labels=[y.year for y in yearly],
+            id=name, fdc=fdc, recess=recess, monthly=monthly, mean=r(mean_all, 1), info=STATION_INFO.get(name, ""), name=name.replace("Koeln", "Köln").replace("-", " – "), short=SHORT.get(name, name.replace("Koeln", "Köln")), n=len(yearly), labels=[y.year for y in yearly],
             sub=f"daily discharge, {yearly[0].year}–{yearly[-1].year}: {len(yearly)} years · mean {mean_all:,.0f} m³/s",
             rec=[r(y.mean_flow / mean_all, 3) for y in yearly], rec_label="Year's mean flow (1.0 = this station's average year)",
-            score=[r(s, 3) for s in score], norm=[r(model.normalized(y.year)) if f else None for y, f in zip(yearly, fit)],
-            norm_all=[r(model.normalized(y.year)) for y in yearly], fit=fit, rank=rk, weekly=weekly, weekly_median=med, weekly_label="Weekly mean flow, as a share of the station's mean (grey: its typical year)",
+            score=[r(rm.nll[y.year], 3) for y in yearly], norm=[r(rm.unusual[y.year]) if f else None for y, f in zip(yearly, fit)],
+            norm_all=[r(rm.unusual[y.year]) for y in yearly], fit=fit, rank=None, weekly=weekly, weekly_median=med, weekly_label="Weekly mean flow, as a share of the station's mean (grey: its typical year)",
             facts=[{"peak": r(y.max_flow, 1), "low": r(y.min_flow, 1), "mean": r(y.mean_flow, 1), "days": y.n_days} for y in yearly],
             top=order[:6],
-            summary=dict(components=int(model.pca.n_components_), variance=r(sum(model.explained_variance_ratio), 3), n_fit=int(sum(fit))),
-            unit_fit_note={str(y): "Too few days to describe a year: scored, never used to fit the model." for y in model.excluded_years},
-            **columns(rows, X.tolist(), res.tolist()),
+            summary=dict(components=rm.n_components, variance=r(rm.explained, 3), n_fit=rm.n_fit),
+            unit_fit_note={str(y): "Too few days to describe a year: scored, never used to fit the model." for y in rm.excluded_years},
+            typ=dict(months=[r(v / mean_all, 3) for v in rm.typical_months], hi=r(rm.typical_highest / mean_all, 3), lo=r(rm.typical_lowest / mean_all, 3)),
+            raw=[[shown[n](y) for y in yearly] for n in names], z=zs, res=[[r(v * v, 3) for v in col] for col in zs],
         ))
     limits = [
-        "One model per station, fitted on that station's own years, so a score compares a year with its own station only. Colour is scaled within each station.",
-        "It flags unusual combinations of features, not extremes, and does not reliably flag droughts: the 1976 drought ranks 3rd of 70 years at Lustenau but 187th of 208 at Köln; the 1995 Köln flood ranks 101st.",
+        "One model per station, fitted on that station's own complete years, so a score compares a year only with its own station: 0.95 means more unusual than 95% of that station's years, and every station has years near 1.00.",
+        "The score says how far a year departed from the station's typical year, not which way. The six measures show what departed: a wetter or drier year, a higher or lower flood peak or low flow, a flashier or steadier river, a slower or quicker recession, a shifted season.",
+        "Checked, not validated: of 30 documented flood and drought years at six stations, 22 score 0.70 or higher, against a much weaker showing for the earlier model. Those events were looked at while the model was built, so this is a sanity check. A summer-only drought such as 2003 reads as ordinary at Köln (0.43) and Lobith (0.39).",
         "The four alpine stations end in 2014; the Rhine stations end in 2020 (Lustenau, Basel, Lobith) and 2024 (Köln). Köln's first year (1816) has 61 days and is scored, not fitted.",
+        "The model uses the flow record only. Snow and glacier melt (the cryosphere) and groundwater are not in it yet; they are meant to join as further dimensions of the same model, each with its own measures.",
+        "The river body is a schematic, not a map: positions are not to scale, branch width is each station's usual flow, and the confluences (the Lütschine and the Aare at Brienzwiler into the Aare at Thun; the Aare and the Reuss into the Rhine above Basel) are placed from the river geography, not from the data files. Only the eight gauges are drawn; there is nothing between them.",
+        "The window only limits what is drawn. Each station's model is still fitted on all of its own complete years, so scores are the same in both windows; the gold marks the highest-scoring year inside the chosen window. The default window is the 70 years (1951–2020) over which all four Rhine stations overlap, as in Issue 6; the alpine stations end in 2014 and show as no record afterwards.",
         "Nothing here has been tested with viewers. A high score means the year was unusual for its station, not that a person would feel it so.",
     ]
-    return dict(kind="river_year", views=[["ribbon", "Ribbon"]], bands=[dict(name="Rhine mainstem", layers=[0, 1, 2, 3]), dict(name="Alpine headwaters", layers=[4, 5, 6, 7])], groups=groups, features=[
-        dict(key=RIVER_FEATS[0], label="Mean flow vs recent norm", unit="", desc="The year's mean flow against the mean of the 30 years before it (0 = normal)."),
-        dict(key=RIVER_FEATS[1], label="Peak ratio", unit="log10", desc="log10 of the highest day divided by the year's mean flow: how sharp the biggest flood was."),
-        dict(key=RIVER_FEATS[2], label="Low-flow ratio", unit="", desc="The lowest day divided by the year's mean flow: how close the river came to running dry."),
-        dict(key=RIVER_FEATS[3], label="Flow-duration slope", unit="", desc="Steepness of the flow-duration curve: flashy rivers are steep, steady ones are flat."),
-        dict(key=RIVER_FEATS[4], label="Recession constant", unit="", desc="How slowly flow falls back after a peak: the river's memory of what it just carried."),
-        dict(key=RIVER_FEATS[5], label="Seasonal swing", unit="", desc="Highest monthly mean minus lowest, as a share of the year's mean."),
+    body = dict(nodes=[dict(id="Lustenau", x=0.5, y=0.15, side="r"), dict(id="Basel", x=0.5, y=0.47, side="r"), dict(id="Koeln", x=0.5, y=0.73, side="r"), dict(id="Lobith", x=0.5, y=0.9, side="r"),
+                       dict(id="Aare-Brienzwiler", x=0.12, y=0.04, side="l"), dict(id="Weisse Lütschine-Zweilütschinen", x=0.28, y=0.02, side="r"), dict(id="Aare-Thun", x=0.3, y=0.22, side="l"), dict(id="Reuss-Andermatt", x=0.78, y=0.06, side="r")],
+                note="The eight gauges drawn as one river flowing down the page, as on the Issue 6 cover. Width is each station's usual flow; colour is how unusual the year is at each station, not which way: hover a station to see the year's flow and what makes it unusual. Press play, or click a station.",
+                edges=[["Lustenau", "Basel"], ["Basel", "Koeln"], ["Koeln", "Lobith"], ["Aare-Brienzwiler", "Aare-Thun"], ["Weisse Lütschine-Zweilütschinen", "Aare-Thun"], ["Aare-Thun", "Basel"], ["Reuss-Andermatt", "Basel"]])
+    return dict(kind="river_year", frame=dict(fdc_p=FDC_P, recess_lag=RECESS_LAG), views=[["ribbon", "Ribbon"]], windows=[["issue6", "1951–2020, as in Issue 6", 1951, 2020], ["full", "Full record, 1816–2024", None, None]], body=body, bands=[dict(name="Rhine mainstem", layers=[0, 1, 2, 3], fill=True), dict(name="Alpine headwaters", layers=[4, 5, 6, 7], lanes=True)], groups=groups, features=[
+        dict(key="wetness", label="Wetness", fw="Pulse", unit="× average", desc="The year's mean flow as a multiple of the station's average year.", words=["drier than usual through the year", "wetter than usual through the year"]),
+        dict(key="flood", label="Flood peak", fw="Pulse", unit="× typical", desc="The year's highest day as a multiple of the highest day of the station's typical year.", words=["a lower flood peak than usual", "a higher flood peak than usual"]),
+        dict(key="low", label="Low flow", fw="Pulse", unit="× typical", desc="The year's lowest 7-day mean flow as a multiple of the station's typical low flow: how close the river came to running dry.", words=["a lower low flow than usual", "a higher low flow than usual"]),
+        dict(key="personality", label="Flashiness", fw="Personality", unit="", desc="Steepness of the flow-duration curve: a flashy river is steep, a steady one flat.", words=["a steadier river than usual", "a flashier river than usual"]),
+        dict(key="memory", label="Recession", fw="Memory", unit="", desc="How slowly flow falls back after a peak: close to 1 means the river holds its water.", words=["a river quicker to fall back than usual", "a river slower to fall back than usual"]),
+        dict(key="season", label="Seasonal shift", fw="Breath", unit="log10", desc="Winter water against summer water, compared with the station's typical year: positive means more winter water and less summer water.", words=["less winter water and more summer water than usual", "more winter water and less summer water than usual"]),
     ], limits=limits)
 
 
@@ -242,9 +269,9 @@ PAGES = {
         deck="What the pipeline does with daily discharge at eight stations, before anything is mapped to XR.",
         unit="year", unit_plural="years",
         steps=[("Record", "Daily discharge at eight stations, drawn as in Issue 6: one column per year, each station a layer stacked on a shared spine. Height is the year's mean flow relative to the station's own average year."),
-               ("Diagnostics", "Each year is summarised by six scale-free numbers, so a glacial stream and a lowland river can be compared. Pick one to see it across the record."),
-               ("Score", "One unsupervised model per station learns what a typical year looks like there. The score is how badly each year fits it. Colour runs from typical to most unusual, scaled within the station.")],
-        method="PCA with 2 components, one model per station, fitted on that station's complete years.",
+               ("Diagnostics", "Each year is described by six plain measures against the station's own typical year, so a glacial stream and a lowland river can be compared. They follow the four frameworks of Issue 6: the hydrograph (wetness, flood peak, low flow), the flow duration curve (flashiness), the recession curve (memory) and the seasonal cycle (breath). Pick one to see it at all eight stations."),
+               ("Score", "One unsupervised model per station learns what a typical year looks like there: the rhythm of its months, its floods and low flows. The score is how unusual each year is for that station, the share of its own years that are less unusual. It does not say which way; the six measures do.")],
+        method="A probabilistic PCA of each station's year patterns (twelve monthly anomalies, flood, low flow, flashiness and recession, all against the station's typical year), fitted on its complete years. A year is unusual if its overall pattern is improbable or any one of the six measures strays far.",
         source="Four Rhine stations (GRDC): Lustenau, Basel, Köln, Lobith. Four alpine stations (FOEN): Weisse Lütschine–Zweilütschinen, Reuss–Andermatt, Aare–Brienzwiler, Aare–Thun."),
     "hwi": dict(
         fn=hwi, eyebrow="Human-Water Interface (HWI)", title="L'Aire, Geneva",

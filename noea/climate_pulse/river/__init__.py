@@ -6,10 +6,10 @@ rainfall. See Issue 6 "River Anatomy".
 Public API:
     from noea.climate_pulse.river import build_profile, map_series
 
-    # optional year-level context (trend-aware baseline + learned anomaly):
-    yearly  = build_yearly(ts)
-    anomaly = fit_anomaly_model(yearly)
-    map_series(profile, ts, yearly=yearly, anomaly=anomaly)
+    # optional year-level context (trend-aware baseline + how unusual each year was):
+    yearly = build_yearly(ts)
+    regime = fit_regime_model(year_vectors(ts))      # the river-specific model (regime.py); fit_anomaly_model is the earlier one
+    map_series(profile, ts, yearly=yearly, anomaly=regime)
 """
 from .models import TimeSeries, XRParameters, DiagnosticProfile, YearlyFlow
 from .frameworks import build_profile
@@ -18,6 +18,7 @@ from .loaders import load_grdc_station, load_rhine_stations, load_alpine_station
 from .synthetic import make_leman_like
 from .yearly import build_yearly
 from .anomaly import RiverAnomalyModel, fit_anomaly_model
+from .regime import RegimeModel, fit_regime_model, year_vectors
 
 __all__ = [
     "TimeSeries",
@@ -34,4 +35,7 @@ __all__ = [
     "build_yearly",
     "RiverAnomalyModel",
     "fit_anomaly_model",
+    "RegimeModel",
+    "fit_regime_model",
+    "year_vectors",
 ]

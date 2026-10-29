@@ -9,6 +9,8 @@ circle, January at the top. Valence and arousal come from `noea/climate_pulse/ra
 record that has not been tested with viewers. The heart has three views of the same stage, **Flat**, **3D** and **Map** (every
 year as a dot on valence against arousal, the current year moving).
 
+The Rhine and alpine rivers chapter is laid out the same way. The result is on top: the eight gauges drawn as one branching river that flows down the page, coloured by the chosen year's anomaly score, with a year slider and play. Below it are the analysis steps and the **Ribbon** (Issue 6's stacked ribbon) with a station chip for each gauge. A window switch limits what is drawn to 1951–2020 (the 70 years all four Rhine stations share, as in Issue 6) or the full record; the models are still fitted on each station's whole record, so scores and ranks do not change. The river is a schematic, not a map: width is each station's usual flow, and the confluences are placed from the river geography, not from the data files. The rivers are scored by `noea/climate_pulse/river/regime.py`: each year is described against the station's own typical year (twelve monthly anomalies, flood peak, low flow, flashiness, recession), a probabilistic PCA learns what the station's years look like, and the score is the share of its own years that are less unusual. Six plain measures, one for each framework of Issue 6, say what departed. The model is built in dimensions so that the cryosphere and groundwater can be added later.
+
 | File | What it is |
 | --- | --- |
 | `build_explorers.py` | Computes each implementation's data and writes standalone pages and `data/*.json` |

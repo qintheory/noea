@@ -42,12 +42,18 @@
   <h1 id="title"></h1>
   <p class="deck" id="deck"></p>
   <section class="heart" id="heartBox" aria-label="The result" hidden></section>
+  <section class="heart" id="riverBox" aria-label="The result" hidden>
+    <div class="hv"><canvas id="river" tabindex="0" role="img" aria-label="The gauges drawn as one branching river, coloured by the chosen year's anomaly score"></canvas><div class="tip" id="riverTip" hidden></div></div>
+    <div class="pulsebar" id="bodybar"><button type="button" id="bodyPlay">Play</button><input type="range" id="bodyRange" min="0" max="0" value="0" step="1" aria-label="Year"><output id="bodyYear"></output></div>
+    <div class="legend" id="riverLegend"><span>an ordinary year</span><i></i><span>among its most unusual years</span></div>
+    <p class="hint" id="riverNote" style="margin-bottom:0"></p>
+  </section>
 
   <div class="steps" id="steps" role="tablist" aria-label="Pipeline stage"></div>
   <p class="step-text" id="stepText"></p>
 
   <div id="viewBox" hidden>
-    <p class="chips-label">View</p>
+    <p class="chips-label" id="viewLabel">View</p>
     <div class="chips" id="views"></div>
   </div>
   <div id="groupBox" hidden>
@@ -64,6 +70,7 @@
     <canvas id="main" tabindex="0" role="img"></canvas>
     <div class="tip" id="tip" hidden></div>
   </figure>
+  <p class="barkey" id="barKey" hidden><span id="bkText"></span><span class="bkscale"><i id="bk1"></i>1.0<i id="bk2"></i>2.0</span></p>
   <div class="legend" id="legend" hidden><span id="lgA">typical</span><i></i><span id="lgB">most unusual</span></div>
   <p class="hint" id="viewNote" style="margin-bottom:8px"></p>
   <p class="step-text" id="sumLine" hidden style="min-height:0;margin-bottom:6px"></p>
@@ -77,7 +84,7 @@
       <p class="facts" id="uFacts"></p>
       <p class="note" id="uNote" hidden></p>
       <table id="table">
-        <thead><tr><th>Diagnostic</th><th class="num">Value</th><th class="hide-sm">Against typical</th><th class="hide-sm">Share of misfit</th></tr></thead>
+        <thead><tr><th>Diagnostic</th><th class="num">Value</th><th class="hide-sm">Against typical</th><th class="hide-sm" id="shareHead">Share of misfit</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
