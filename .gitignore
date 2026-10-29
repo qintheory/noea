@@ -10,3 +10,5 @@ noea/human_water_interface/data/
 # L'Aire chapter data for the web page: derived from OCEau data. Remove this line to publish it.
 docs/explore/data/hwi.json
 docs/explore/_*.html
+# OCEau-derived stills for the data owner, not for publication
+docs/explore/_stills/

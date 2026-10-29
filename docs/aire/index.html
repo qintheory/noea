@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>L'Aire, Geneva · Human-Water Interface</title>
+<style>
+/* Human-Water Interface artefact for L'Aire, Geneva. Reads hwi.json (derived from OCEau's validated export) or window.__HWI__. Unlisted, not indexed. */
+:root {
+  --bg: #e0ecf8; --panel: #ffffff; --ink: #111a20; --muted: #4d6270; --rule: #b7c9d8;
+  --c0: #c4d9e3; --c1: #8fb4c4; --c2: #3d7f96; --c3: #00526f; --c4: #00212e;   /* typical .. most unusual */
+  --gold: #9a7424; --rain: #5d93a8; color-scheme: light;
+  --title: neue-frutiger-world, Frutiger, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --body: athelas, "Crimson Pro", Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 28px 16px 56px; }
+.eyebrow { font: 700 12px/1.3 var(--title); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+h1 { font: 400 clamp(22px, 3.4vw, 30px)/1.2 var(--title); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 10px; }
+.deck { color: var(--muted); max-width: 70ch; margin: 0 0 20px; }
+.panel { background: var(--panel); border: 1px solid var(--rule); }
+.stage { position: relative; }
+canvas { display: block; width: 100%; }
+#river { height: clamp(440px, 62vw, 560px); touch-action: pan-y; }
+#strip { height: 70px; cursor: ew-resize; touch-action: none; border-top: 1px solid var(--rule); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 12px; border-top: 1px solid var(--rule); font-family: var(--title); font-size: 13px; }
+button, select { font: 400 13px/1 var(--title); letter-spacing: .04em; padding: 8px 12px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); border-radius: 0; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+button:focus-visible, canvas:focus-visible, select:focus-visible { outline: 2px solid var(--c3); outline-offset: 2px; }
+.date { font: 400 17px/1 var(--title); letter-spacing: .08em; min-width: 11ch; }
+.tag { font: 400 11px/1 var(--title); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.spacer { flex: 1; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font: 400 12px/1.3 var(--title); color: var(--muted); padding: 10px 12px; border-top: 1px solid var(--rule); }
+.legend .ramp { display: inline-block; width: 110px; height: 9px; vertical-align: middle; margin: 0 6px; background: linear-gradient(90deg, var(--c0), var(--c1), var(--c2), var(--c3), var(--c4)); }
+.legend i { display: inline-block; width: 10px; height: 10px; vertical-align: -1px; margin-right: 5px; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 0; }
+.card { padding: 12px 14px; }
+.card h2 { font: 400 14px/1.2 var(--title); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 8px; }
+.card p { margin: 0 0 6px; font-size: 15px; line-height: 1.45; }
+.card .big { font: 400 22px/1.1 var(--title); letter-spacing: .02em; margin: 0 0 8px; }
+.card .why { font-size: 14px; color: var(--muted); }
+.notes { margin: 20px 0 0; max-width: 78ch; font-size: 14px; color: var(--muted); }
+.notes li { margin: 0 0 6px; }
+.src { font: 400 12px/1.4 var(--title); color: var(--muted); margin: 14px 0 0; }
+@media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Human-Water Interface (HWI)</p>
+  <h1>L'Aire, Geneva</h1>
+  <p class="deck">One small river, read through three gauges a day at a time. The river runs downstream from the top of the page. At each gauge its width is the flow that day, its colour is how unusual the day was for that gauge, and the rain falls on the stretch around it. Press play, or drag along the record.</p>
+
+  <div class="panel stage">
+    <canvas id="river" tabindex="0" aria-label="The Aire as one river with three gauges, on the selected day"></canvas>
+    <div class="bar">
+      <button id="play" type="button" aria-pressed="false">Play</button>
+      <select id="speed" aria-label="Speed"><option value="3">Slow</option><option value="8" selected>Medium</option><option value="20">Fast</option></select>
+      <span class="date" id="date"></span>
+      <span class="tag" id="seen"></span>
+      <span class="spacer"></span>
+      <span class="tag">Jump to</span>
+      <span id="jumps" style="display:flex;flex-wrap:wrap;gap:6px"></span>
+    </div>
+    <canvas id="strip" aria-label="The whole record, one column per week, three gauges stacked. Drag to move through time."></canvas>
+    <div class="legend">
+      <span>Colour <span class="ramp"></span> typical → most unusual for the gauge</span>
+      <span>Width: flow at each gauge, log scale; between gauges the river is interpolated</span>
+      <span><i style="background:var(--rain)"></i>Rain, the day's total</span>
+      <span><i style="background:rgba(116,116,116,.45)"></i>No reading</span>
+      <span><i style="border:2px solid var(--gold);border-radius:50%"></i>Beyond the model's 99th percentile</span>
+    </div>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <ul class="notes" id="notes"></ul>
+  <p class="src" id="src"></p>
+  <p id="err" class="notes" hidden>The data file (hwi.json) was not found.</p>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const MS = 864e5, D0 = Date.UTC(2013, 0, 1);
+  const RAMP = [[0, [196, 217, 227]], [0.3, [143, 180, 196]], [0.6, [61, 127, 150]], [0.85, [0, 82, 111]], [1, [0, 33, 46]]];
+  const ramp = (s) => {
+    s = clamp(s);
+    for (let i = 1; i < RAMP.length; i++) if (s <= RAMP[i][0]) {
+      const [a, ca] = RAMP[i - 1], [b, cb] = RAMP[i], t = (s - a) / (b - a);
+      return `rgb(${ca.map((v, k) => Math.round(lerp(v, cb[k], t))).join(",")})`;
+    }
+    return "rgb(0,33,46)";
+  };
+  const cv = $("river"), cx = cv.getContext("2d"), sv = $("strip"), sx = sv.getContext("2d");
+  let D, G, N, FEAT, t = 0, playing = false, last = 0, dragging = false, Q1;
+  const dateOf = (i) => new Date(D0 + Math.round(i) * MS);
+  const fmt = (i) => dateOf(i).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const fontT = '"neue-frutiger-world", Frutiger, "Helvetica Neue", Helvetica, Arial, sans-serif';
+
+  // a value at fractional day tau: linear between two days that both have a reading, else the nearest day (null = none)
+  function at(arr, tau) {
+    const i0 = Math.floor(tau);
+    if (i0 < 0 || i0 >= N) return null;
+    const a = arr[i0], b = i0 + 1 < N ? arr[i0 + 1] : null, f = tau - i0;
+    if (a != null && b != null) return lerp(a, b, f);
+    const n = f < 0.5 ? a : b;
+    return n == null ? null : n;
+  }
+  const L0 = Math.log10(0.02);
+  const wid = (q) => clamp((Math.log10(q + 0.02) - L0) / (Math.log10(Q1 + 0.02) - L0));
+
+  function size(c) {
+    const r = c.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
+    if (c.width !== Math.round(r.width * d) || c.height !== Math.round(r.height * d)) { c.width = Math.round(r.width * d); c.height = Math.round(r.height * d); }
+    c.getContext("2d").setTransform(d, 0, 0, d, 0, 0);
+    return [r.width, r.height];
+  }
+
+  // One river, drawn as a single body that flows down the page. The gauges are stations along it, upstream first;
+  // the width at a station is that gauge's flow on the shown day and the body is interpolated between them.
+  const smooth = (x) => x * x * (3 - 2 * x);
+  const centre = (u, w) => w * 0.5 + Math.sin(u * 6.9 + 0.6) * w * 0.045 + Math.sin(u * 14.5 + 2.1) * w * 0.016;   // decorative bend, no data
+  const hash = (k) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+  function drawRiver(now) {
+    const [w, h] = size(cv);
+    cx.clearRect(0, 0, w, h);
+    const top = 34, bot = h - 34, span = bot - top, maxHalf = Math.min(w * 0.13, 92);
+    const ys = G.map((_, i) => top + span * (0.16 + 0.34 * i));              // stations at 16%, 50%, 84% of the way down
+    const q = G.map((g) => at(g.rec, t)), sh = G.map((g) => at(g.norm, t)), rn = G.map((g) => at(g.rain, t));
+    const have = q.filter((v) => v != null);
+    const half = q.map((v) => (v == null ? null : 3 + wid(v) * (maxHalf - 3)));
+    const fill = (i) => half[i] != null ? half[i] : have.length ? (half.filter((v) => v != null).reduce((a, v) => a + v, 0) / have.length) : maxHalf * 0.3;
+    const hs = G.map((_, i) => fill(i));
+    const at2 = (y, arr) => {                                                  // value at height y, flat beyond the end stations
+      if (y <= ys[0]) return arr[0];
+      for (let i = 1; i < ys.length; i++) if (y <= ys[i]) return lerp(arr[i - 1], arr[i], smooth((y - ys[i - 1]) / (ys[i] - ys[i - 1])));
+      return arr[arr.length - 1];
+    };
+    const shs = sh.map((v) => (v == null ? 0 : v));
+    const miss = (y) => ys.some((yy, i) => half[i] == null && Math.abs(y - yy) < span * 0.17);
+    const cl = (y) => centre((y - top) / span, w);
+    for (let y = top; y < bot; y += 3) {
+      const hw = at2(y, hs), c0 = cl(y), c1 = cl(y + 3), hw1 = at2(y + 3, hs);
+      cx.fillStyle = miss(y) ? "rgba(116,116,116,0.30)" : ramp(at2(y, shs));
+      cx.beginPath();
+      cx.moveTo(c0 - hw, y - 0.5); cx.lineTo(c0 + hw, y - 0.5); cx.lineTo(c1 + hw1, y + 3.5); cx.lineTo(c1 - hw1, y + 3.5); cx.closePath(); cx.fill();
+    }
+    // the water moving: pale streaks run downstream faster where there is more of it
+    const speed = (y) => 0.025 + 0.16 * (at2(y, G.map((_, i) => (q[i] == null ? 0.3 : wid(q[i])))));
+    cx.strokeStyle = "rgba(255,255,255,0.55)"; cx.lineWidth = 1.3; cx.lineCap = "round";
+    for (let k = 0; k < 90; k++) {
+      const lat = (hash(k + 99) * 2 - 1) * 0.8, y0 = hash(k + 7);
+      // each streak keeps its lane and drifts downstream at the speed of the water where it started
+      const y = top + ((y0 + (now / 1000) * speed(top + y0 * span) * 0.9) % 1) * span, len = 6 + 8 * hash(k + 5);
+      if (y + len > bot) continue;
+      cx.beginPath(); cx.moveTo(cl(y) + at2(y, hs) * lat, y); cx.lineTo(cl(y + len) + at2(y + len, hs) * lat, y + len); cx.stroke();
+    }
+    // the rain falling on each station's reach
+    cx.strokeStyle = "rgba(61,127,150,0.75)"; cx.lineWidth = 1.2;
+    G.forEach((g, i) => {
+      const r = rn[i]; if (r == null || r < 0.2) return;
+      const nd = Math.round(clamp(Math.log10(1 + r) / Math.log10(76)) * 46);
+      for (let k = 0; k < nd; k++) {
+        const ph = (hash(k + i * 50) + now / 1000 * (0.7 + 0.5 * hash(k + 20 + i))) % 1, dyy = ys[i] - 96 + ph * 88;
+        const xx = cl(ys[i]) + (hash(k + 300 + i * 50) * 2 - 1) * (maxHalf * 1.3);
+        cx.beginPath(); cx.moveTo(xx, dyy); cx.lineTo(xx - 1.5, dyy + 7); cx.stroke();
+      }
+    });
+    // stations: a cross-section ring, ringed in gold beyond the model's 99th percentile, with name and readings beside it
+    cx.textBaseline = "alphabetic";
+    G.forEach((g, i) => {
+      const c = cl(ys[i]), hw = hs[i], sc = at(g.score, t);
+      cx.strokeStyle = "rgba(17,26,32,0.55)"; cx.lineWidth = 1;
+      cx.beginPath(); cx.ellipse(c, ys[i], hw, 6, 0, 0, Math.PI * 2); cx.stroke();
+      if (sc != null && sc > g.p99) { cx.strokeStyle = "#9a7424"; cx.lineWidth = 2.2; cx.beginPath(); cx.ellipse(c, ys[i], hw + 5, 11, 0, 0, Math.PI * 2); cx.stroke(); }
+      const xl = w * 0.5 - maxHalf * 1.55 - w * 0.07, xr = w * 0.5 + maxHalf * 1.55 + w * 0.07;   // clear of the widest swing of the bends
+      cx.fillStyle = "#111a20"; cx.font = `400 12px ${fontT}`; cx.textAlign = "right";
+      if ("letterSpacing" in cx) cx.letterSpacing = "1.6px";
+      cx.fillText(g.name.toUpperCase(), xl, ys[i] - 2);
+      if ("letterSpacing" in cx) cx.letterSpacing = "0px";
+      cx.fillStyle = "#4d6270"; cx.font = `400 13px ${fontT}`;
+      cx.fillText(q[i] == null ? "no reading" : `${q[i].toFixed(q[i] < 1 ? 2 : 1)} m³/s`, xl, ys[i] + 16);
+      cx.textAlign = "left";
+      cx.fillStyle = "#3d7f96"; cx.fillText(rn[i] == null ? "no rain reading" : `rain ${rn[i].toFixed(1)} mm`, xr, ys[i] + 5);
+    });
+    cx.textAlign = "left"; cx.fillStyle = "#4d6270"; cx.font = `400 11px ${fontT}`;
+    if ("letterSpacing" in cx) cx.letterSpacing = "1.4px";
+    cx.fillText("UPSTREAM", 12, top + 4); cx.fillText("DOWNSTREAM", 12, bot);
+    if ("letterSpacing" in cx) cx.letterSpacing = "0px";
+  }
+
+  // the whole record: one column per week, three rows; colour = the week's highest score shade
+  const WEEKS = () => Math.ceil(N / 7);
+  function drawStrip() {
+    const [w, h] = size(sv);
+    sx.clearRect(0, 0, w, h);
+    const rows = G.length, rh = (h - 22) / rows, nW = WEEKS(), cw = w / nW;
+    G.forEach((g, gi) => {
+      for (let k = 0; k < nW; k++) {
+        let best = null, any = false;
+        for (let d = k * 7; d < Math.min(N, k * 7 + 7); d++) { if (g.rec[d] != null) any = true; const s = g.norm[d]; if (s != null && (best == null || s > best)) best = s; }
+        sx.fillStyle = !any ? "rgba(116,116,116,0.28)" : ramp(best || 0);
+        sx.fillRect(k * cw, gi * rh + 1, Math.ceil(cw) + 0.5, rh - 2);
+      }
+    });
+    // the years the model never saw
+    const x23 = (Date.UTC(2023, 0, 1) - D0) / MS / N * w;
+    sx.fillStyle = "#111a20"; sx.font = `400 11px ${fontT}`;
+    for (let y = 2013; y <= 2025; y++) { const x = (Date.UTC(y, 0, 1) - D0) / MS / N * w; sx.fillRect(x, rows * rh, 1, 5); if (y % 2 === 1) sx.fillText(String(y), x + 3, h - 5); }
+    sx.fillStyle = "rgba(17,26,32,0.5)"; sx.fillText("unseen by the model →", x23 + 40, h - 5);
+    sx.strokeStyle = "#111a20"; sx.lineWidth = 1; sx.beginPath(); sx.moveTo(x23 + 0.5, 0); sx.lineTo(x23 + 0.5, rows * rh); sx.stroke();
+    // the shown window and the present
+    const xb = clamp(t / N) * w;
+    sx.strokeStyle = "#9a7424"; sx.lineWidth = 2; sx.beginPath(); sx.moveTo(xb, 0); sx.lineTo(xb, rows * rh); sx.stroke();
+  }
+
+  let shown = -1;
+  function cards() {
+    const i = clamp(Math.round(t), 0, N - 1);
+    $("date").textContent = fmt(i);
+    const yr = dateOf(i).getUTCFullYear();
+    $("seen").textContent = yr >= 2023 ? "A year the model never saw" : yr === 2013 ? "Scored, not learned from" : "A year the model learned from";
+    if (i === shown) return;
+    shown = i;
+    $("cards").innerHTML = G.map((g) => {
+      const q = g.rec[i], rain = g.rain[i], sc = g.score[i], pc = g.pct[i];
+      let why = "";
+      if (sc != null && sc > g.p90) {
+        const r = FEAT.map((f, j) => [f.label, g.res[j][i] || 0]).sort((a, b) => b[1] - a[1])[0];
+        why = `Most of the score comes from “${r[0].toLowerCase()}” (${Math.round(100 * r[1] / sc)}%).`;
+      } else if (sc != null) why = "Within the usual range of days it learned from.";
+      return `<div class="panel card"><h2>${g.name}</h2>
+        <p class="big">${q == null ? "No reading" : q.toFixed(q < 1 ? 2 : 1) + " m³/s"}</p>
+        <p>${rain == null ? "No rain reading" : "Rain " + rain.toFixed(1) + " mm"}</p>
+        <p>${pc == null ? "Not scored." : `More unusual than ${pc >= 0.9995 ? "99.9%" : (pc * 100).toFixed(pc > 0.99 ? 1 : 0) + "%"} of the days it learned from.`}</p>
+        <p class="why">${why}</p></div>`;
+    }).join("");
+  }
+
+  function frame(now) {
+    if (playing) {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      t += dt * Number($("speed").value);
+      if (t >= N - 1) { t = N - 1; setPlaying(false); }
+    }
+    last = now;
+    drawRiver(now); drawStrip(); cards();
+    requestAnimationFrame(frame);
+  }
+  function setPlaying(on) { playing = on; $("play").textContent = on ? "Pause" : "Play"; $("play").setAttribute("aria-pressed", on); }
+  function seek(i) { t = clamp(i, 0, N - 1); shown = -1; }
+  function stripAt(e) {
+    const r = sv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width;
+    seek(x * N);
+  }
+
+  function init(data) {
+    D = data; G = D.groups; N = G[0].n; FEAT = D.features;
+    Q1 = Math.max(...G.map((g) => Math.max(...g.rec.filter((v) => v != null))));
+    // starting points: days when at least two gauges were beyond the model's 99th percentile, the rainiest first (one per spell).
+    // A single gauge's top score is not enough: Bossenailles's highest days are near-zero readings, not storms (see the note).
+    const picks = [];
+    for (let i = 0; i < N; i++) {
+      if (G.filter((g) => g.score[i] != null && g.score[i] > g.p99).length >= 2) picks.push([i, G.reduce((a, g) => a + (g.rain[i] || 0), 0) / G.length]);
+    }
+    picks.sort((a, b) => b[1] - a[1]);
+    const chosen = [];
+    for (const [d] of picks) if (chosen.every((c) => Math.abs(c - d) > 5)) chosen.push(d);
+    $("jumps").innerHTML = chosen.slice(0, 4).sort((a, b) => a - b).map((d) => `<button type="button" data-d="${d}">${fmt(d).replace(/ (\d{4})$/, " $1")}</button>`).join("");
+    $("jumps").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setPlaying(false); seek(Number(b.dataset.d)); } });
+    $("notes").innerHTML = [
+      `The river flows from the top of the page to the bottom. The order of the gauges, Bossenailles, Centenaire, Pont-Rouge from upstream, is our reading and has not been confirmed by OCEau. Between gauges the width and colour are interpolated, not measured; the bends are decoration and carry no data.`,
+      ...(D.groups.map((g) => g.note).filter(Boolean).map((n) => `<b>${G.find((g) => g.note === n).name}.</b> ${n}`)),
+      ...D.limits.filter((l) => !/order along the river/.test(l)),
+    ].map((n) => `<li>${n}</li>`).join("");
+    $("src").textContent = `Source: ${D.source} ${D.method}`;
+    const qd = new URLSearchParams(location.search).get("d");          // ?d=2024-06-09 opens on that day
+    seek(qd && !isNaN(Date.parse(qd)) ? (Date.parse(qd) - D0) / MS : chosen.length ? chosen[0] : N - 1);
+    $("play").addEventListener("click", () => { if (t >= N - 1) seek(0); setPlaying(!playing); });
+    sv.addEventListener("pointerdown", (e) => { dragging = true; sv.setPointerCapture(e.pointerId); setPlaying(false); stripAt(e); });
+    sv.addEventListener("pointermove", (e) => { if (dragging) stripAt(e); });
+    sv.addEventListener("pointerup", () => { dragging = false; });
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "SELECT") return;
+      if (e.key === " ") { e.preventDefault(); $("play").click(); }
+      else if (e.key === "ArrowRight") { setPlaying(false); seek(Math.round(t) + (e.shiftKey ? 7 : 1)); }
+      else if (e.key === "ArrowLeft") { setPlaying(false); seek(Math.round(t) - (e.shiftKey ? 7 : 1)); }
+    });
+    requestAnimationFrame(frame);
+  }
+
+  (window.__HWI__ ? Promise.resolve(window.__HWI__) : fetch("hwi.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }))
+    .then(init).catch(() => { $("err").hidden = false; });
+})();
+</script>
+</body>
+</html>
