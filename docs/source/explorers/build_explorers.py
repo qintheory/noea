@@ -98,13 +98,13 @@ def rainfall():
     g["unit_fit_note"] = {"2025": "Partial year (data end in January): scored, never used to fit the model."}
     af = fit_affect_model(profile, model)                                   # valence and arousal: two PCA factors plus the anomaly, relative to the record
     g["va"] = {"v": [r(af.valence[y.year], 3) if y.year in af.valence else None for y in ys], "a": [r(af.arousal[y.year], 3) if y.year in af.arousal else None for y in ys]}
-    g["affect"] = {"correlations": {k: r(v, 2) for k, v in af.correlations.items()}, "checks": af.checks, "intensity": af.intensity_loadings, "wetness": af.wetness_loadings}
+    g["affect"] = {"correlations": {k: r(v, 2) for k, v in af.correlations.items()}, "checks": af.checks, "storminess": af.storminess_loadings, "wetness": af.wetness_loadings}
     passed = sum(af.checks.values()); c = af.correlations
     limits = [
         f"The model flags unusual combinations of features, not extremes. 1931 is among the top-scoring years with a peak of only {ys[idx[1931]].r_value:.0f} mm, "
         f"while 1926, which holds the largest single day ({ys[idx[1926]].r_value:.0f} mm), scores {norm[idx[1926]]:.2f} and 2023 scores {norm[idx[2023]]:.2f}, on a scale where 1 is the most unusual year of the record. "
         f"The 1963 drought scores {norm[idx[1963]]:.2f}.",
-        f"Valence and arousal (the corner map) are relative to this record: each year is placed against its {af.n_fit} fitted years. They combine two PCA factors learned from the data, intensity and wetness, with the anomaly score, and agree with it (arousal r = {c['arousal~anomaly']:+.2f}, valence r = {c['valence~anomaly']:+.2f}). "
+        f"Valence and arousal (the corner map) are relative to this record: each year is placed against its {af.n_fit} fitted years. They combine two PCA factors learned from the data, storminess and wetness, with the anomaly score, and agree with it (arousal r = {c['arousal~anomaly']:+.2f}, valence r = {c['valence~anomaly']:+.2f}). "
         f"They pass {passed} of {len(af.checks)} consistency checks fixed in advance; valence and arousal share about half their variance (r = {c['valence~arousal']:+.2f}). No viewers rated anything, so this is a hypothesis about affect, not a measurement.",
         "There are no data for 1940–1946, so the record has 135 years rather than 142. 2025 is a partial year (the data end in January): it is scored by the fitted model and never shaped it.",
         "Years with missing days are totalled and summarised over the days that exist (n_days is between 268 and 299 for 55 of the 135 years).",
@@ -257,7 +257,7 @@ def hwi():
 PAGES = {
     "rainfall": dict(
         fn=rainfall, eyebrow="Climate Pulse · Atmosphere", title="Hong Kong rainfall",
-        deck="Daily rainfall at the Hong Kong Observatory, 1884 to 2025. Each year becomes six diagnostics: its wettest day, how rare that day is, how concentrated the rain was, its day-to-day spread, how often it rained, and its total against the previous 30 years. A PCA learns what a typical year looks like and scores how badly each year fits it, the anomaly, and finds two factors in the same numbers: intensity and wetness. Arousal is how intense and how surprising the year was. Valence falls with how far the year departs from a normal one, wetter, drier or more intense, and with how surprising it was. Both are ranks within this record: a hypothesis about affect, not yet tested with viewers.",
+        deck="Daily rainfall at the Hong Kong Observatory, 1884 to 2025. Each year becomes six diagnostics: its wettest day, how rare that day is, how concentrated the rain was, its day-to-day spread, how often it rained, and its total against the previous 30 years. A PCA learns what a typical year looks like and scores how badly each year fits it, the anomaly, and finds two factors in the same numbers: storminess and wetness. Arousal is how stormy and how surprising the year was. Valence falls with how far the year departs from a normal one, wetter, drier or more intense, and with how surprising it was. Both are ranks within this record: a hypothesis about affect, not yet tested with viewers.",
         unit="year", unit_plural="years",
         steps=[("Record", "Daily rainfall at the Hong Kong Observatory, 1884 to 2025, as an ECG: every spike is a real day's rain, and the trace moves through the years as the heart beats, one year per beat. Click it to jump to a year."),
                ("Diagnostics", "Each year is summarised by six numbers. Like an ECG, each beat is one year, placed at the date of its wettest day; its height is the chosen diagnostic, in standard deviations from typical, up or down."),

@@ -4,7 +4,7 @@ One explorer per implementation (Hong Kong rainfall, Rhine and alpine rivers, L'
 drawn from it and the learned anomaly score, and stops before the XR mapping. Everything is generated from the pipeline.
 
 For Hong Kong the page also shows a heart: one beat per year. **Colour is valence** (two colours and the gradient between them),
-**beat strength is arousal**, **beat pace is the days since the previous annual peak**, and the shape is the year's rain round a
+**beat intensity is arousal**, **beat pace is the days since the previous annual peak**, and the shape is the year's rain round a
 circle, January at the top. Valence and arousal come from `noea/climate_pulse/rainfall/affect.py`, a learned map relative to the
 record that has not been tested with viewers. The heart has three views of the same stage, **Flat**, **3D** and **Map** (every
 year as a dot on valence against arousal, the current year moving).

@@ -119,7 +119,7 @@ SPEAKER_NOTES = {
         "since 1884, and discharge at eight Rhine and alpine stations. The curatorial layer decides how a result should feel. "
         "It is separate code, so the feeling can be redesigned without changing any science. Its output is valence and arousal, "
         "chosen by design and checked against named historical events. For Hong Kong rainfall there is also a learned reading: "
-        "two PCA factors, intensity and wetness, plus the anomaly score, ranked within the record. Seven of eight checks fixed in advance "
+        "two PCA factors, storminess and wetness, plus the anomaly score, ranked within the record. Seven of eight checks fixed in advance "
         "pass; valence and arousal correlate at minus 0.71, just past the limit. None of it has been tested with people."),
     6: ("Machine learning has one job so far: finding unusual years. For each record an unsupervised model learns what a "
         "typical year looks like, the rhythm of its months, its floods and its low flows, then scores how unusual each year is, as the "

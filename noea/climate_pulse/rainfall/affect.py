@@ -4,16 +4,16 @@ An emergent affect map for Hong Kong rainfall: valence and arousal from two PCA 
 There are no participants and no measured affect behind this, so it does not "learn emotion". It builds a hypothesis
 about affect from the data, and checks the hypothesis for consistency. Three ingredients, all learned from the record:
 
-  intensity  how energetic a year was. Factor 1 of a varimax-rotated PCA on the six yearly features; it loads on the
+  storminess how stormy a year was. Factor 1 of a varimax-rotated PCA on the six yearly features; it loads on the
              peak day, the rarity of the peak, how concentrated the rain was, and the spread (0.76 to 0.97).
   wetness    wet or dry compared with a normal year. Factor 2; it loads on wet-day frequency and on the year's total
              against the mean of the 30 years before (about 0.8).
   surprise   the anomaly score of anomaly.py: how badly the year fits the record's usual combinations of features.
-             It is out of the PCA plane, so it adds what intensity and wetness cannot see.
+             It is out of the PCA plane, so it adds what storminess and wetness cannot see.
 
-  arousal = the mean of the year's percentile rank on intensity and on surprise.
+  arousal = the mean of the year's percentile rank on storminess and on surprise.
   valence = 1 - 2 x the percentile rank of (the mean of the rank of its departure from a normal year, and of its surprise),
-            where departure = sqrt(max(intensity, 0)^2 + wetness^2): intense, very wet or very dry all read as unpleasant,
+            where departure = sqrt(max(storminess, 0)^2 + wetness^2): intense, very wet or very dry all read as unpleasant,
             a quiet year does not.
 
 Both are RELATIVE to this record (a rank among its fitted years, 0 to 1 for arousal, -1 to +1 for valence), and the
@@ -50,7 +50,7 @@ def _varimax(L: np.ndarray, iterations: int = 200) -> np.ndarray:
 class AffectModel:
     valence: dict[int, float]
     arousal: dict[int, float]
-    intensity_loadings: dict[str, float]
+    storminess_loadings: dict[str, float]
     wetness_loadings: dict[str, float]
     correlations: dict[str, float]
     checks: dict[str, bool]
@@ -71,12 +71,12 @@ def fit_affect_model(profile: DiagnosticProfile, anomaly: AnomalyModel) -> Affec
     r_val, wet_i = FEATURE_NAMES.index("r_value"), FEATURE_NAMES.index("wet_day_frequency")
     k_int = int(np.argmax(np.abs(Lr[r_val]))); k_wet = 1 - k_int
     s_int, s_wet = np.sign(Lr[r_val, k_int]), np.sign(Lr[wet_i, k_wet])           # signs fixed by meaning: more intense is +, wetter is +
-    intensity, wetness = F[:, k_int] * s_int, F[:, k_wet] * s_wet
+    storminess, wetness = F[:, k_int] * s_int, F[:, k_wet] * s_wet
 
     pct = lambda v: (rankdata(v) - 0.5) / n
     surprise = np.array([anomaly.normalized(y.year) for y in years])
-    departure = np.sqrt(np.maximum(intensity, 0) ** 2 + wetness ** 2)
-    arousal = (pct(intensity) + pct(surprise)) / 2
+    departure = np.sqrt(np.maximum(storminess, 0) ** 2 + wetness ** 2)
+    arousal = (pct(storminess) + pct(surprise)) / 2
     valence = 1 - 2 * pct((pct(departure) + pct(surprise)) / 2)
 
     idx = {y.year: i for i, y in enumerate(years)}
@@ -97,6 +97,6 @@ def fit_affect_model(profile: DiagnosticProfile, anomaly: AnomalyModel) -> Affec
     load = lambda k, s: {f: round(float(Lr[i, k] * s), 2) for i, f in enumerate(FEATURE_NAMES)}
     return AffectModel(
         valence={y.year: float(v) for y, v in zip(years, valence)}, arousal={y.year: float(a) for y, a in zip(years, arousal)},
-        intensity_loadings=load(k_int, s_int), wetness_loadings=load(k_wet, s_wet),
+        storminess_loadings=load(k_int, s_int), wetness_loadings=load(k_wet, s_wet),
         correlations={"arousal~anomaly": corr(arousal, surprise), "valence~anomaly": corr(valence, surprise), "valence~arousal": corr(valence, arousal)},
         checks=checks, n_fit=n)

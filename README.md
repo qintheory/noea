@@ -60,11 +60,11 @@ counterpart, in development; see below.
 ### Valence and arousal for Hong Kong, learned from the record
 
 [`affect.py`](noea/climate_pulse/rainfall/affect.py) builds an emergent affect map from the record
-itself. A varimax-rotated PCA on the six yearly features finds two factors, *intensity* (the peak day,
+itself. A varimax-rotated PCA on the six yearly features finds two factors, *storminess* (the peak day,
 its rarity, how concentrated the rain was, its spread) and *wetness* (wet-day frequency and the year's
 total against the previous 30 years). Then:
 
-- **arousal** is the mean of the year's rank on intensity and on the anomaly score;
+- **arousal** is the mean of the year's rank on storminess and on the anomaly score;
 - **valence** is the mean of the year's rank on its departure from a normal year (intense, very wet or very
   dry) and on the anomaly score, reversed so the most unusual years read towards −1.
 

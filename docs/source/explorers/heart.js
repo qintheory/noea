@@ -36,12 +36,12 @@
     const peakMax = Math.max(...G.facts.map(f => f.peak));
     const vaColor = vaColorBase;
     const last = () => { for (let i = G.n - 1; i >= 0; i--) if (G.fit[i]) return i; return G.n - 1; };
-    // The beat: its pace is the record's (the days since the previous annual peak, the ECG's R-R interval); its strength is arousal.
+    // The beat: its pace is the record's (the days since the previous annual peak, the ECG's R-R interval); its intensity is arousal.
     const dur = (i) => 0.88 * (G.facts[i].rr > 0 ? Math.max(0.6, Math.min(1.4, G.facts[i].rr / 365)) : 1);
     const gapAfter = (i) => i < G.n - 1 && G.labels[i + 1] - G.labels[i] > 1;
     const KEY = '<dl class="hkey"><div><dt>Shape</dt><dd>The year\'s rain round a circle, January at the top.</dd><dd class="kv" data-k="peak"></dd></div>' +
       '<div><dt>Pace</dt><dd>Days since the previous peak.</dd><dd class="kv" data-k="pace"></dd></div>' +
-      (G.va ? '<div><dt>Strength</dt><dd>Arousal.</dd><dd class="kv" data-k="arousal"></dd></div>' +
+      (G.va ? '<div><dt>Intensity</dt><dd>Arousal.</dd><dd class="kv" data-k="arousal"></dd></div>' +
         '<div><dt>Colour</dt><dd>Valence <span class="legend"><span>unpleasant</span><i style="background:linear-gradient(90deg,' + rgbStr(UNPLEASANT) + ',' + rgbStr(PLEASANT) + ')"></i><span>pleasant</span></span></dd><dd class="kv" data-k="valence"></dd></div>' : '') +
       '<div class="k3" hidden><dt>3D</dt><dd>Drag to turn.</dd></div></dl>';
 
