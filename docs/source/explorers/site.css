@@ -53,8 +53,7 @@ html, body { margin: 0; background: var(--bg); }
 .stage-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; }
 .how { flex: 1 1 260px; max-width: 46ch; margin: 0; color: var(--muted); font-size: 14px; }
 .stage-art { margin: 0; align-self: center; }
-.stage-art .hv .hva { width: 152px; height: 172px; bottom: 28px; }
-.stage-art .hv .h2d, .stage-art .hv .h3d { height: clamp(280px, 46vw, min(58vh, 520px)); }
+.stage-art .hv .h2d, .stage-art .hv .h3d { --hpad: 100px; height: calc(clamp(260px, 38vw, min(44vh, 400px)) + var(--hpad)); }
 
 .related { font-size: 14px; color: var(--muted); margin: -10px 0 20px; max-width: 70ch; }
 

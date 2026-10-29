@@ -14,6 +14,17 @@
     if (!threeLoading) threeLoading = new Promise((res, rej) => { const s = document.createElement("script"); s.src = THREE_URL; s.onload = res; s.onerror = () => rej(new Error("three.js did not load")); document.head.appendChild(s); });
     return threeLoading;
   }
+  // Colour is valence, and only valence: two colours and the gradient between them. Violet when unpleasant, pale aqua when pleasant.
+  // The beat is arousal. Size stays with the rain.
+  const UNPLEASANT = [91, 63, 209], PLEASANT = [169, 226, 220], WHITE = [255, 255, 255], BLACK = [20, 28, 40];
+  const mixRGB = (p, q, t) => p.map((x, k) => Math.round(x + (q[k] - x) * t));
+  const rgbStr = (c) => "rgb(" + c.join(",") + ")";
+  function vaColorBase(v, a, dl) {                    // a is ignored on purpose; dl lightens (>0) or deepens (<0) for the glow, the core and the outline
+    let c = mixRGB(UNPLEASANT, PLEASANT, (Math.max(-1, Math.min(1, v)) + 1) / 2);
+    if (dl > 0) c = mixRGB(c, WHITE, Math.min(1, dl * 1.4)); else if (dl < 0) c = mixRGB(c, BLACK, Math.min(1, -dl * 1.4));
+    return rgbStr(c);
+  }
+  const signed = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
   function smooth(a) { const n = a.length, w = [0.06, 0.24, 0.4, 0.24, 0.06]; return a.map((_, k) => { let s = 0; for (let j = -2; j <= 2; j++) s += w[j + 2] * a[(k + j + n) % n]; return s; }); }
 
   function create(root, G, opts) {
@@ -23,17 +34,19 @@
     const bins = G.daily.map(d => { const b = new Array(PBINS).fill(0); for (let k = 0; k < 366; k++) if (d[k] > 0) b[Math.min(PBINS - 1, Math.floor(k / 5))] += d[k] / 10; return b; });
     const cache = {}, shape = (i) => cache[i] || (cache[i] = smooth(smooth(bins[i].map(v => Math.min(2.4, Math.sqrt(v / 100))))));
     const peakMax = Math.max(...G.facts.map(f => f.peak));
+    const vaColor = vaColorBase;
     const last = () => { for (let i = G.n - 1; i >= 0; i--) if (G.fit[i]) return i; return G.n - 1; };
+    // The beat: its pace is the record's (the days since the previous annual peak, the ECG's R-R interval); its strength is arousal.
     const dur = (i) => 0.88 * (G.facts[i].rr > 0 ? Math.max(0.6, Math.min(1.4, G.facts[i].rr / 365)) : 1);
     const gapAfter = (i) => i < G.n - 1 && G.labels[i + 1] - G.labels[i] > 1;
-    const KEY = '<dl class="hkey"><div><dt>Shape</dt><dd>The year\'s rain round a circle, January at the top.</dd></div>' +
-      '<div><dt>Beat</dt><dd>Size: peak day. Pace: days since the last peak.</dd></div>' +
-      '<div><dt>Colour</dt><dd>Anomaly score <span class="legend"><span>typical</span><i></i><span>unusual</span></span></dd></div>' +
-      (G.va ? '<div><dt>Corner</dt><dd>Valence and arousal, relative to the record.</dd></div>' : '') +
+    const KEY = '<dl class="hkey"><div><dt>Shape</dt><dd>The year\'s rain round a circle, January at the top.</dd><dd class="kv" data-k="peak"></dd></div>' +
+      '<div><dt>Pace</dt><dd>Days since the previous peak.</dd><dd class="kv" data-k="pace"></dd></div>' +
+      (G.va ? '<div><dt>Strength</dt><dd>Arousal.</dd><dd class="kv" data-k="arousal"></dd></div>' +
+        '<div><dt>Colour</dt><dd>Valence <span class="legend"><span>unpleasant</span><i style="background:linear-gradient(90deg,' + rgbStr(UNPLEASANT) + ',' + rgbStr(PLEASANT) + ')"></i><span>pleasant</span></span></dd><dd class="kv" data-k="valence"></dd></div>' : '') +
       '<div class="k3" hidden><dt>3D</dt><dd>Drag to turn.</dd></div></dl>';
 
-    root.innerHTML = '<div class="hv"><canvas class="h2d" role="img" aria-label="A blob drawn from one year of Hong Kong rainfall, beating once for each year of the record"></canvas><div class="h3d" hidden></div>' + (G.va ? '<canvas class="hva" role="img" aria-label="Valence and arousal of the year, on a circumplex"></canvas>' : "") + '</div>' +
-      (opts.toggle ? '<div class="heart-tools" role="group" aria-label="Rendering"><button type="button" class="chip" data-m="2d" aria-pressed="true">Flat</button><button type="button" class="chip" data-m="3d" aria-pressed="false">3D</button></div>' : "") +
+    root.innerHTML = '<div class="hv"><canvas class="h2d" role="img" aria-label="A blob drawn from one year of Hong Kong rainfall, beating once for each year of the record"></canvas><div class="h3d" hidden></div></div>' +
+      (opts.toggle ? '<div class="heart-tools" role="group" aria-label="Rendering"><button type="button" class="chip" data-m="2d" aria-pressed="true">Flat</button><button type="button" class="chip" data-m="3d" aria-pressed="false">3D</button>' + (G.va ? '<button type="button" class="chip" data-m="map" aria-pressed="false">Map</button>' : "") + '</div>' : "") +
       (opts.controls ? '<div class="pulsebar"><button type="button" class="hplay">Pause</button><input class="hrange" type="range" min="0" max="0" value="0" step="1" aria-label="Year"><output class="hyear"></output></div>' : "") +
       (opts.note ? KEY : "");
     const $r = (s) => root.querySelector(s), c2 = $r(".h2d"), h3 = $r(".h3d");
@@ -46,11 +59,21 @@
       const m = i === 0 ? ease3(clamp01(u / 0.6)) : ease3(clamp01(u / 0.45));
       const s1 = shape(i), s0 = i === 0 ? s1.map(() => 0) : shape(prev), sh = s1.map((v, k) => s0[k] + (v - s0[k]) * m);
       const score = (G.norm[prev] || 0) + ((G.norm[i] || 0) - (G.norm[prev] || 0)) * m;
-      const amp = 0.012 + 0.07 * Math.sqrt(G.facts[i].peak / peakMax);
+      const va = G.va, ok = (k) => va && va.v[k] !== null && va.a[k] !== null; let v = 0, a = 0.3;
+      if (ok(i)) { const p0 = ok(prev) ? prev : i; v = va.v[p0] + (va.v[i] - va.v[p0]) * m; a = va.a[p0] + (va.a[i] - va.a[p0]) * m; }
+      const amp = va ? 0.015 + 0.42 * Math.pow(a, 1.6) : 0.012 + 0.07 * Math.sqrt(G.facts[i].peak / peakMax);
       const beat = S.rest ? 0 : Math.exp(-Math.pow((u - 0.10) / 0.05, 2)) + 0.55 * Math.exp(-Math.pow((u - 0.34) / 0.06, 2));
-      return { i, prev, sh, score, amp, sc: 1 + amp * beat, beat };
+      const tint = (dl, ds) => va ? vaColor(v, a, dl, ds) : ramp(0.3 + 0.7 * score + (dl || 0));
+      return { i, prev, sh, score, amp, v, a, tint, color: tint(0, 0), sc: 1 + amp * beat, beat };
     }
     function emit() { if (opts.onYear) opts.onYear(S.i); }
+    function updateLegend() {
+      if (!opts.note) return; const key = S.rest ? "rest" : String(S.i); if (S.legendKey === key) return; S.legendKey = key;
+      const set = (k, t) => { const e = $r('[data-k="' + k + '"]'); if (e) e.textContent = t; };
+      const i = S.i, f = G.facts[i], has = !S.rest && G.va && G.va.v[i] !== null && G.va.a[i] !== null;
+      set("peak", S.rest ? "—" : "peak day " + fmt(f.peak) + " mm"); set("pace", S.rest || !(f.rr > 0) ? "—" : f.rr + " days");
+      set("arousal", has ? G.va.a[i].toFixed(2) : "—"); set("valence", has ? signed(G.va.v[i]) : "—");
+    }
     function sync() {
       const p = $r(".hplay"); if (!p) return;
       p.textContent = S.playing ? "Pause" : (S.i >= last() && S.u >= dur(S.i) ? "Replay" : "Play");
@@ -73,10 +96,10 @@
       if (c2.width !== Math.round(w * dpr) || c2.height !== Math.round(h * dpr)) { c2.width = Math.round(w * dpr); c2.height = Math.round(h * dpr); }
       const x = c2.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h); x.font = "12px " + FONT;
       const ink = css("--ink"), muted = css("--muted"), rule = css("--rule"), f = frame(), i = f.i;
-      const R = Math.min(w / 2 - 56, h / 2 - 40), cx = w / 2, cy = h / 2 - 8, Rb = R * 0.55, A = R * 0.2;
+      const pad = parseFloat(getComputedStyle(c2).getPropertyValue("--hpad")) || 0, R = Math.min(w / 2 - 56, (h - pad) / 2 - 40), cx = w / 2, cy = h / 2 - 8, Rb = R * 0.55, A = R * 0.2;
       x.textBaseline = "middle"; x.textAlign = "center";
       x.strokeStyle = rule; x.lineWidth = 1; x.setLineDash([2, 4]); x.beginPath(); x.arc(cx, cy, Rb, 0, 6.2832); x.stroke(); x.setLineDash([]);
-      x.fillStyle = muted; [["JAN", -90], ["APR", 0], ["JUL", 90], ["OCT", 180]].forEach(([t, d]) => { const a = d * Math.PI / 180, r = R + 22; x.fillText(t, cx + r * Math.cos(a), cy + r * Math.sin(a)); });
+      if (!S.bare) { x.fillStyle = muted; [["JAN", -90], ["APR", 0], ["JUL", 90], ["OCT", 180]].forEach(([t, d]) => { const a = d * Math.PI / 180, r = R + 22; x.fillText(t, cx + r * Math.cos(a), cy + r * Math.sin(a)); }); }
       if (S.rest) {
         x.fillStyle = ink; x.font = "400 17px " + css("--title"); x.fillText("No record", cx, cy - 7); x.font = "12px " + FONT; x.fillStyle = muted;
         x.fillText(G.labels[i] + 1 + "–" + (G.labels[i + 1] - 1), cx, cy + 16); return;
@@ -84,23 +107,21 @@
       const path = (sh, k0) => { const p = sh.map((v, k) => { const a = -Math.PI / 2 + 2 * Math.PI * (k + 0.5) / PBINS, r = (Rb + A * v) * k0; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }), n = p.length;
         x.beginPath(); x.moveTo((p[n - 1][0] + p[0][0]) / 2, (p[n - 1][1] + p[0][1]) / 2);
         for (let k = 0; k < n; k++) { const q = p[(k + 1) % n]; x.quadraticCurveTo(p[k][0], p[k][1], (p[k][0] + q[0]) / 2, (p[k][1] + q[1]) / 2); } x.closePath(); };
-      for (let g = 3; g >= 1; g--) { const j = i - g; if (j < 0) continue; path(shape(j), 1); x.strokeStyle = rgba(ramp(0.15 + 0.85 * (G.norm[j] || 0)), 0.2 / g + 0.04); x.lineWidth = 1.2; x.stroke(); }
+      for (let g = 3; g >= 1; g--) { const j = i - g; if (j < 0) continue; path(shape(j), 1); x.strokeStyle = rgba(G.va && G.va.v[j] !== null ? vaColor(G.va.v[j], G.va.a[j]) : ramp(0.15 + 0.85 * (G.norm[j] || 0)), 0.2 / g + 0.04); x.lineWidth = 1.2; x.stroke(); }
       const gr = (Rb + A * 2.4) * 1.15 * f.sc, glow = x.createRadialGradient(cx, cy, Rb * 0.3, cx, cy, gr);
-      glow.addColorStop(0, rgba(css("--c1"), 0)); glow.addColorStop(0.6, rgba(ramp(f.score), 0.16 + 0.06 * f.beat)); glow.addColorStop(1, rgba(ramp(f.score), 0));
+      glow.addColorStop(0, rgba(f.color, 0)); glow.addColorStop(0.6, rgba(f.color, 0.18 + 0.06 * f.beat)); glow.addColorStop(1, rgba(f.color, 0));
       x.fillStyle = glow; x.beginPath(); x.arc(cx, cy, gr, 0, 6.2832); x.fill();
       path(f.sh, f.sc);
-      const fill = x.createRadialGradient(cx, cy, 0, cx, cy, (Rb + A * 2.4) * f.sc); fill.addColorStop(0, rgba(css("--c0"), 0.5)); fill.addColorStop(0.55, rgba(ramp(0.1 + 0.7 * f.score), 0.6)); fill.addColorStop(1, rgba(ramp(0.1 + 0.9 * f.score), 0.88));
-      x.fillStyle = fill; x.fill(); x.strokeStyle = rgba(ramp(Math.min(1, 0.3 + f.score)), 0.95); x.lineWidth = 1.6; x.stroke();
-      x.fillStyle = ink; x.font = "400 20px " + css("--title"); x.fillText(G.labels[i], cx, cy - 5); x.font = "12px " + FONT;
-      x.fillStyle = muted; x.fillText(G.fit[i] ? "score " + G.norm[i].toFixed(2) : "not fitted", cx, cy + 20);
-      const rr = G.facts[i].rr; x.fillText("peak day " + fmt(G.facts[i].peak) + " mm" + (rr > 0 ? " · " + rr + " days since the previous peak" : ""), cx, h - 10);
+      const fill = x.createRadialGradient(cx, cy, 0, cx, cy, (Rb + A * 2.4) * f.sc); fill.addColorStop(0, rgba(f.tint(0.14, -0.12), 0.5)); fill.addColorStop(0.55, rgba(f.tint(0.05, -0.04), 0.6)); fill.addColorStop(1, rgba(f.color, 0.88));
+      x.fillStyle = fill; x.fill(); x.strokeStyle = rgba(f.tint(-0.1, 0.08), 0.95); x.lineWidth = 1.6; x.stroke();
+      if (!S.bare) { x.fillStyle = ink; x.font = "400 20px " + css("--title"); x.fillText(G.labels[i], cx, cy); } x.font = "12px " + FONT; x.fillStyle = muted;
     }
 
     /* ----- 3D: the same shape as a soft, round body floating in mid-air, with its shadow far below ----- */
     const NA = 96, NR = 18, ROWS = 2 * NR + 1;
     const VERT = "varying vec3 vN; varying vec3 vV; varying vec3 vObj;\nvoid main() { vObj = position; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }";
     const FRAG = [
-      "uniform vec3 uColor; uniform float uTime; uniform float uBeat; uniform float uBack;",
+      "uniform vec3 uColor; uniform float uTime; uniform float uBeat; uniform float uBack; uniform float uArousal;",
       "varying vec3 vN; varying vec3 vV; varying vec3 vObj;",
       "float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }",
       "float noise(vec3 x) { vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);",
@@ -116,9 +137,9 @@
       "  float wisp = pow(1.0 - abs(sin(w * 13.0)), 7.0);",
       "  float fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 2.2);",
       "  vec3 col = uColor * (0.64 + 0.5 * diff) * (0.82 + 0.34 * w);",
-      "  col = mix(col, vec3(1.0), wisp * 0.62) + fres * vec3(0.26, 0.38, 0.52) + uBeat * 0.1 * uColor;",
+      "  col = mix(col, vec3(1.0), wisp * (0.34 + 0.4 * uArousal)) + fres * vec3(0.26, 0.38, 0.52) * (0.7 + 0.5 * uArousal) + uBeat * 0.1 * uColor;",
       "  vec3 hv = normalize(L + v); col += pow(max(dot(n, hv), 0.0), 46.0) * 0.5;",
-      "  float a = clamp(0.5 + 0.4 * fres + 0.3 * wisp + 0.1 * diff, 0.0, 0.96);",
+      "  float a = clamp(0.4 + 0.18 * uArousal + 0.4 * fres + 0.3 * wisp + 0.1 * diff, 0.0, 0.96);",
       "  if (uBack > 0.5) { col *= 0.55; a *= 0.5; }",
       "  gl_FragColor = vec4(col, a);",
       "}"].join("\n");
@@ -130,7 +151,7 @@
       const geo = new T.BufferGeometry(), pos = new Float32Array(ROWS * NA * 3), idx = [];
       for (let j = 0; j < ROWS - 1; j++) for (let a = 0; a < NA; a++) { const a2 = (a + 1) % NA, p = j * NA + a, q = j * NA + a2, r = (j + 1) * NA + a, s = (j + 1) * NA + a2; idx.push(p, r, q, q, r, s); }
       geo.setAttribute("position", new T.BufferAttribute(pos, 3)); geo.setIndex(idx);
-      const shared = { uColor: { value: new T.Color(0x4682b4) }, uTime: { value: 0 }, uBeat: { value: 0 } };
+      const shared = { uColor: { value: new T.Color(0x4682b4) }, uTime: { value: 0 }, uBeat: { value: 0 }, uArousal: { value: 0.3 } };
       const mk = (back, side) => new T.ShaderMaterial({ uniforms: Object.assign({ uBack: { value: back } }, shared), vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, side });
       const inner = new T.Mesh(geo, mk(1, T.BackSide)), body = new T.Mesh(geo, mk(0, T.FrontSide)); inner.renderOrder = 0; body.renderOrder = 1;   // the inside first, then the outside over it
       const group = new T.Group(); group.add(inner); group.add(body);
@@ -148,7 +169,7 @@
       const t3 = S.t3, w = h3.clientWidth, h = h3.clientHeight; if (!t3 || !w || !h) return;
       if (t3.w !== w || t3.h !== h) { t3.renderer.setSize(w, h, false); t3.camera.aspect = w / h; t3.camera.updateProjectionMatrix(); t3.w = w; t3.h = h; }
       const f = frame(), Rb = 1.9, A = 0.5, Ht = 1.85, Hb = 1.85, pos = t3.pos, soft = smooth(smooth(smooth(f.sh))), bob = Math.sin(S.T * 1.05), Yc = 2.6 + 0.14 * bob;
-      const grow = 1 + 0.5 * f.amp * f.beat, ys = (S.rest ? 0.2 : 1) * (1 + 2.4 * f.amp * f.beat);          // the beat: a little wider, a little taller
+      const grow = 1 + 0.7 * f.amp * f.beat, ys = (S.rest ? 0.2 : 1) * (1 + 0.45 * f.amp * f.beat);          // the beat: a little wider, a little taller
       const radius = Array.from({ length: NA }, (_, a) => S.rest ? Rb : (Rb + A * resample(soft, a)) * grow);
       for (let j = 0; j < ROWS; j++) {
         const top = j <= NR, t = top ? j / NR : (2 * NR - j) / NR, y = Yc + (top ? Ht : -Hb) * Math.sqrt(Math.max(0, 1 - t * t)) * ys;      // a round body, floating
@@ -156,38 +177,37 @@
       }
       t3.geo.attributes.position.needsUpdate = true; t3.geo.computeVertexNormals();
       t3.floor.material.opacity = (S.rest ? 0.25 : 0.7) - 0.18 * bob; t3.floor.scale.set(5.2 - 0.5 * bob, 5.2 - 0.5 * bob, 1);   // the shadow below, far away like on the poster
-      t3.shared.uColor.value.set(ramp(0.3 + 0.7 * f.score)); t3.shared.uTime.value = S.T; t3.shared.uBeat.value = S.rest ? 0 : f.beat;
+      t3.shared.uColor.value.set(f.color); t3.shared.uArousal.value = 0.5; t3.shared.uTime.value = S.T; t3.shared.uBeat.value = S.rest ? 0 : f.beat;
       if (!S.drag && !reduce) t3.group.rotation.y = 0.28 * Math.sin(S.T * 0.35);
-      const g = G.facts[f.i], rr = g.rr, txt = S.rest ? "No record " + (G.labels[f.i] + 1) + "–" + (G.labels[f.i + 1] - 1) : '<b>' + G.labels[f.i] + '</b><span>' + (G.fit[f.i] ? "score " + G.norm[f.i].toFixed(2) : "not fitted") + " · peak day " + fmt(g.peak) + " mm" + (rr > 0 ? " · " + rr + " days since the previous peak" : "") + "</span>";
+      const txt = S.rest ? "No record " + (G.labels[f.i] + 1) + "–" + (G.labels[f.i + 1] - 1) : '<b>' + G.labels[f.i] + '</b>';
       if (t3.capTxt !== txt) { t3.cap.innerHTML = txt; t3.capTxt = txt; }
       t3.renderer.render(t3.scene, t3.camera);
     }
 
-    /* ----- the corner: valence (left-right) and arousal (up-down), every year a faint dot, the current year moving ----- */
-    function drawVA() {
-      const c = $r(".hva"); if (!c || !G.va) return;
-      const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight; if (!w || !h) return;
-      if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-      const x = c.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
-      const pad = 5, side = Math.min(w - 2 * pad, h - 24), X = (v) => pad + (v + 1) / 2 * side, Y = (a) => pad + (1 - a) * side;
-      const muted = css("--muted"), rule = css("--rule"), f = frame(), i = f.i, prev = Math.max(0, i - 1);
-      x.fillStyle = rgba(css("--bg"), 0.55); x.fillRect(pad, pad, side, side); x.strokeStyle = rule; x.lineWidth = 1; x.strokeRect(pad + 0.5, pad + 0.5, side - 1, side - 1);
-      x.setLineDash([2, 3]); x.beginPath(); x.moveTo(X(0) + 0.5, pad); x.lineTo(X(0) + 0.5, pad + side); x.moveTo(pad, Y(0.5) + 0.5); x.lineTo(pad + side, Y(0.5) + 0.5); x.stroke(); x.setLineDash([]);
-      x.fillStyle = rgba(muted, 0.32); for (let k = 0; k < G.n; k++) { const v = G.va.v[k], a = G.va.a[k]; if (v === null || a === null) continue; x.beginPath(); x.arc(X(v), Y(a), 1.2, 0, 6.2832); x.fill(); }
-      x.font = "9.5px " + FONT; x.fillStyle = muted; x.textAlign = "center"; x.textBaseline = "middle";
-      x.fillText("activated", pad + side / 2, pad + 8); x.fillText("calm", pad + side / 2, pad + side - 8);
-      x.save(); x.translate(pad + 8, pad + side / 2); x.rotate(-Math.PI / 2); x.fillText("unpleasant", 0, 0); x.restore();
-      x.save(); x.translate(pad + side - 8, pad + side / 2); x.rotate(Math.PI / 2); x.fillText("pleasant", 0, 0); x.restore();
+    /* ----- the map: valence (left to right) and arousal (up and down), every year a dot, the current year moving; a third rendering of the central stage, beside the flat blob and the 3D body ----- */
+    function drawMap() {
+      const dpr = window.devicePixelRatio || 1, w = c2.clientWidth, h = c2.clientHeight; if (!w || !h || !G.va) return;
+      if (c2.width !== Math.round(w * dpr) || c2.height !== Math.round(h * dpr)) { c2.width = Math.round(w * dpr); c2.height = Math.round(h * dpr); }
+      const x = c2.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+      const pad = parseFloat(getComputedStyle(c2).getPropertyValue("--hpad")) || 0, side = 0.58 * Math.min(w - 190, h - pad - 30, 460), L = (w - side) / 2, T = (h - side) / 2 - 8;
+      const X = (v) => L + (v + 1) / 2 * side, Y = (a) => T + (1 - a) * side;
+      const ink = css("--ink"), muted = css("--muted"), rule = css("--rule"), f = frame(), i = f.i, prev = Math.max(0, i - 1);
+      x.fillStyle = rgba(css("--bg"), 0.55); x.fillRect(L, T, side, side); x.strokeStyle = rule; x.lineWidth = 1; x.strokeRect(L + 0.5, T + 0.5, side - 1, side - 1);
+      x.setLineDash([2, 4]); x.beginPath(); x.moveTo(X(0) + 0.5, T); x.lineTo(X(0) + 0.5, T + side); x.moveTo(L, Y(0.5) + 0.5); x.lineTo(L + side, Y(0.5) + 0.5); x.stroke(); x.setLineDash([]);
+      for (let k = 0; k < G.n; k++) { const v = G.va.v[k], a = G.va.a[k]; if (v === null || a === null) continue; x.fillStyle = rgba(vaColor(v, a), 0.55); x.beginPath(); x.arc(X(v), Y(a), 3, 0, 6.2832); x.fill(); }
+      x.font = "12px " + FONT; x.fillStyle = muted; x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText("ACTIVATED", L + side / 2, T - 18); x.fillText("CALM", L + side / 2, T + side + 18);
+      x.save(); x.translate(L - 18, T + side / 2); x.rotate(-Math.PI / 2); x.fillText("UNPLEASANT", 0, 0); x.restore();
+      x.save(); x.translate(L + side + 18, T + side / 2); x.rotate(Math.PI / 2); x.fillText("PLEASANT", 0, 0); x.restore();
       const ok = (k) => k >= 0 && G.va.v[k] !== null && G.va.a[k] !== null;
-      let text = "no record";
-      if (!S.rest && ok(i)) {
-        const m = i === 0 ? ease3(clamp01(S.u / 0.6)) : ease3(clamp01(S.u / 0.45)), p0 = ok(prev) ? prev : i;
-        const v = G.va.v[p0] + (G.va.v[i] - G.va.v[p0]) * m, a = G.va.a[p0] + (G.va.a[i] - G.va.a[p0]) * m;
-        x.lineWidth = 1; for (let g2 = 6; g2 >= 1; g2--) { const j = i - g2, j2 = j + 1; if (j < 0 || !ok(j) || !ok(j2)) continue; x.strokeStyle = rgba(css("--c3"), 0.5 / g2); x.beginPath(); x.moveTo(X(G.va.v[j]), Y(G.va.a[j])); x.lineTo(X(G.va.v[j2]), Y(G.va.a[j2])); x.stroke(); }
-        x.fillStyle = ramp(0.3 + 0.7 * f.score); x.beginPath(); x.arc(X(v), Y(a), 4, 0, 6.2832); x.fill(); x.strokeStyle = css("--ink"); x.lineWidth = 1.2; x.stroke();
-        text = "valence " + (G.va.v[i] >= 0 ? "+" : "−") + Math.abs(G.va.v[i]).toFixed(2) + " · arousal " + G.va.a[i].toFixed(2);
-      }
-      x.fillStyle = muted; x.font = "10.5px " + FONT; x.fillText(text, pad + side / 2, pad + side + 13);
+      if (S.rest || !ok(i)) { x.fillStyle = muted; x.fillText("No record", L + side / 2, T + side / 2); return; }
+      const m = i === 0 ? ease3(clamp01(S.u / 0.6)) : ease3(clamp01(S.u / 0.45)), p0 = ok(prev) ? prev : i;
+      const v = G.va.v[p0] + (G.va.v[i] - G.va.v[p0]) * m, a = G.va.a[p0] + (G.va.a[i] - G.va.a[p0]) * m;
+      x.lineWidth = 1.4; for (let g2 = 6; g2 >= 1; g2--) { const j = i - g2, j2 = j + 1; if (j < 0 || !ok(j) || !ok(j2)) continue; x.strokeStyle = rgba(css("--c3"), 0.5 / g2); x.beginPath(); x.moveTo(X(G.va.v[j]), Y(G.va.a[j])); x.lineTo(X(G.va.v[j2]), Y(G.va.a[j2])); x.stroke(); }
+      const r = 7 * (1 + 0.9 * (f.sc - 1));                                                                // the dot beats with the year
+      x.fillStyle = rgba(f.color, 0.25); x.beginPath(); x.arc(X(v), Y(a), r * 2.4, 0, 6.2832); x.fill();
+      x.fillStyle = f.color; x.beginPath(); x.arc(X(v), Y(a), r, 0, 6.2832); x.fill(); x.strokeStyle = ink; x.lineWidth = 1.4; x.stroke();
+      x.fillStyle = ink; x.font = "400 15px " + css("--title"); x.textAlign = v > 0 ? "right" : "left"; x.fillText(G.labels[i], X(v) + (v > 0 ? -r - 8 : r + 8), Y(a) + (a > 0.9 ? 14 : 0));
     }
 
     /* ----- loop and controls ----- */
@@ -196,7 +216,7 @@
       S.raf = 0; if (S.dead || S.suspended || !root.clientWidth) return;
       S.raf = requestAnimationFrame(tick);
       const dt = S.last ? Math.min(0.1, (now - S.last) / 1000) : 0; S.last = now; S.T += dt;
-      step(dt); if (S.mode === "3d") render3d(); else draw2d(); drawVA();
+      step(dt); if (S.mode === "3d") render3d(); else if (S.mode === "map") drawMap(); else draw2d(); updateLegend();
     }
     async function setMode(m) {
       if (m === "3d") {
@@ -216,6 +236,13 @@
     if (opts.mode === "3d") setMode("3d");
     return {
       go: (i, settled, silent) => go(i, settled, silent), year: () => S.i, playing: () => S.playing,
+      // one frame, for stills: year i, u seconds into its beat (the beat peaks near 0.10), in the view that is showing; bare drops the month labels and the year. Returns a copy of the canvas.
+      still(i, u, bare) {
+        S.i = i; S.u = u; S.rest = false; S.bare = !!bare;
+        const src = S.mode === "3d" ? (S.t3 && (render3d(), S.t3.renderer.domElement)) : (S.mode === "map" ? drawMap() : draw2d(), c2);
+        S.bare = false; if (!src || !src.width) return null;
+        const out = document.createElement("canvas"); out.width = src.width; out.height = src.height; out.getContext("2d").drawImage(src, 0, 0); return out;
+      },
       // the date the heart has reached, in decimal years: through the year while it beats, across the empty years while it rests
       time() { const y = G.labels[S.i]; if (S.rest) return y + 1 + (G.labels[S.i + 1] - y - 1) * clamp01(S.u / 2.4); return S.playing ? y + clamp01(S.u / dur(S.i)) : y + 1; },
       suspend() { S.suspended = true; if (S.raf) cancelAnimationFrame(S.raf); S.raf = 0; }, resume() { S.suspended = false; ensure(); },

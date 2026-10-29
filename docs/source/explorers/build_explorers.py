@@ -229,8 +229,8 @@ def hwi():
 
 PAGES = {
     "rainfall": dict(
-        fn=rainfall, eyebrow="Climate Pulse · rainfall", title="Hong Kong rainfall",
-        deck="What the pipeline does with Hong Kong's daily rainfall, 1884 to 2025, before anything is mapped to XR.",
+        fn=rainfall, eyebrow="Climate Pulse · Atmosphere", title="Hong Kong rainfall",
+        deck="Daily rainfall at the Hong Kong Observatory, 1884 to 2025. Each year becomes six diagnostics: its wettest day, how rare that day is, how concentrated the rain was, its day-to-day spread, how often it rained, and its total against the previous 30 years. A PCA learns what a typical year looks like and scores how badly each year fits it, the anomaly, and finds two factors in the same numbers: intensity and wetness. Arousal is how intense and how surprising the year was. Valence falls with how far the year departs from a normal one, wetter, drier or more intense, and with how surprising it was. Both are ranks within this record: a hypothesis about affect, not yet tested with viewers.",
         unit="year", unit_plural="years",
         steps=[("Record", "Daily rainfall at the Hong Kong Observatory, 1884 to 2025, as an ECG: every spike is a real day's rain, and the trace moves through the years as the heart beats, one year per beat. Click it to jump to a year."),
                ("Diagnostics", "Each year is summarised by six numbers. Like an ECG, each beat is one year, placed at the date of its wettest day; its height is the chosen diagnostic, in standard deviations from typical, up or down."),
@@ -238,7 +238,7 @@ PAGES = {
         method="PCA with 2 components, fitted on the complete years of this record.",
         source="Hong Kong Observatory, daily rainfall, 1884–2025."),
     "river": dict(
-        fn=rivers, eyebrow="Climate Pulse · rivers", title="Rhine and alpine rivers",
+        fn=rivers, eyebrow="Climate Pulse · Rivers", title="Rhine and alpine rivers",
         deck="What the pipeline does with daily discharge at eight stations, before anything is mapped to XR.",
         unit="year", unit_plural="years",
         steps=[("Record", "Daily discharge at eight stations, drawn as in Issue 6: one column per year, each station a layer stacked on a shared spine. Height is the year's mean flow relative to the station's own average year."),

@@ -97,7 +97,6 @@ window.NOEA_SITE = true;
   function renderPager(ch) {
     const i = CHAPTERS.indexOf(ch), prev = CHAPTERS[i - 1], next = CHAPTERS[i + 1];
     $("pager").innerHTML = '<div class="side"><button class="solid" type="button" id="pagerDocs">Documentation</button></div><div class="side">' +
-      (ch.key === "atmosphere" ? '<a class="btn" href="https://www.meetingofwaters.org/hkheartbeat" target="_blank" rel="noopener">The original Heartbeat ECG ↗</a>' : "") +
       (prev.key !== "intro" ? '<button class="btn" type="button" data-ch="' + prev.key + '">← ' + prev.label + '</button>' : "") +
       (next ? '<button class="btn" type="button" data-ch="' + next.key + '">' + next.label + ' →</button>' : '<button class="btn" type="button" data-ch="intro">Back to the start</button>') + '</div>';
     $("pager").querySelectorAll("[data-ch]").forEach(b => b.addEventListener("click", () => { location.hash = b.dataset.ch; }));

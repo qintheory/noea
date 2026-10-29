@@ -76,8 +76,8 @@ LAYER_SCIENCE = ("Diagnostic layer", "Science", [
 LAYER_CURATORIAL = ("Curatorial layer", "Designed", [
     "Decides how a result should feel: how alarming, how heavy.",
     "Developed separately in Unity3D, for presentation and exhibition.",
-    "Output: valence and arousal. Set by design judgement and checked against named historical "
-    "events; not yet tested with viewers.",
+    "Output: valence and arousal. Designed, and for Hong Kong also learned from the record; checked "
+    "against named historical events, not yet tested with viewers.",
 ])
 
 # ---- 6. machine learning --------------------------------------------------------
@@ -117,7 +117,9 @@ SPEAKER_NOTES = {
     5: ("There are two layers, kept apart on purpose. The diagnostic layer is plain science: Hong Kong's daily rainfall "
         "since 1884, and discharge at eight Rhine and alpine stations. The curatorial layer decides how a result should feel. "
         "It is separate code, so the feeling can be redesigned without changing any science. Its output is valence and arousal, "
-        "chosen by design and checked against named historical events. It has not been tested with people."),
+        "chosen by design and checked against named historical events. For Hong Kong rainfall there is also a learned reading: "
+        "two PCA factors, intensity and wetness, plus the anomaly score, ranked within the record. Seven of eight checks fixed in advance "
+        "pass; valence and arousal correlate at minus 0.71, just past the limit. None of it has been tested with people."),
     6: ("Machine learning has one job so far: finding unusual years. For each record an unsupervised model learns what a "
         "typical year looks like, then scores how badly each year fails to fit. The ribbon is the one from Issue 6, but coloured by "
         "the model's score instead of by discharge. At Lustenau the highest-scoring year is the August 2005 flood and at Köln "
@@ -141,6 +143,9 @@ REFERENCES = [
 # ---- CHECKED FACTS (re-verify when data or models change) --------------------------
 # * Hong Kong record: HKO daily rainfall, 1884–2025 (2025 is a partial year, scored but not fitted).
 # * River records: 8 stations (4 Rhine, GRDC; 4 alpine, FOEN). Longest: Köln from 1816.
+# * Hong Kong valence and arousal (affect.py, checked 2026-10-29): 135 years on record (1940-1946 missing), 134 fitted,
+#   2025 partial (26 days). arousal~anomaly +0.65, valence~anomaly -0.64, valence~arousal -0.71 (7 of 8 pre-set checks pass; the
+#   limit was |r| <= 0.70). 1926: valence -0.99, arousal 0.97; 2023: -0.95, 0.92; 1963: -0.48, 0.24. Relative ranks, not measurements.
 # * The XRParameters table (size, glow, texture, tempo) is deliberately NOT on the slides: it is unconfirmed
 #   scaffolding (see README), not from the Issues, and glow (luminosity) is a constant 0.5 without temperature data.
 # * PCA anomaly model, 2 components, one model per record. Fitted years only: Hong Kong 1926 ranks 7th

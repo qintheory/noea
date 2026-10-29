@@ -16,6 +16,10 @@ at **[meetingofwaters.org/noea](https://www.meetingofwaters.org/noea)**.
 A technical guide to the pipeline is in [`docs/introduction.html`](docs/introduction.html)
 (open it in a browser; arrow keys to move, N for notes).
 
+**Try it:** [`docs/index.html`](docs/index.html) is the interactive page: a heart that beats once
+for each year of Hong Kong's rainfall, with the analyses behind it, and two more prototypes
+(the Rhine and alpine rivers, L'Aire in Geneva). It is built for GitHub Pages and embeds in a web page.
+
 ## In short
 
 Noéa translates long hydrological records into something people can
@@ -30,6 +34,8 @@ Two layers, kept deliberately apart: a **diagnostic layer** (plain science,
 deterministic) and a **curatorial layer** (how a result should feel, designed).
 Machine learning has one job so far: an unsupervised model learns what a
 typical year looks like for each record and scores how unusual each year is.
+For Hong Kong rainfall that score also feeds a second, learned reading of valence
+and arousal (below); the river and L'Aire modules still use designed mappings.
 
 How people respond to the result has not been tested. That is the research.
 
@@ -39,9 +45,10 @@ Noéa is the umbrella. Two independent modules sit under **Climate Pulse**;
 they share only the `TimeSeries` and `XRParameters` shapes in
 [`noea/models.py`](noea/models.py).
 
-- **`climate_pulse.rainfall`**: Hong Kong daily rainfall, Hong Kong
-  Observatory, 1884–2025.
-- **`climate_pulse.river`**: daily discharge at eight stations on the Rhine
+- **`climate_pulse.rainfall`** (Atmosphere): Hong Kong daily rainfall, Hong Kong
+  Observatory, 1884–2025: 135 years on record (1940–1946 are missing), 134 complete
+  enough to fit.
+- **`climate_pulse.river`** (Rivers): daily discharge at eight stations on the Rhine
   and in the Swiss Alps (GRDC and FOEN).
 
 The method is designed to apply to any long record; these two are the
@@ -49,6 +56,24 @@ worked examples, not the scope.
 
 The **Human-Water Interface** (`noea/human_water_interface/`) is the local
 counterpart, in development; see below.
+
+### Valence and arousal for Hong Kong, learned from the record
+
+[`affect.py`](noea/climate_pulse/rainfall/affect.py) builds an emergent affect map from the record
+itself. A varimax-rotated PCA on the six yearly features finds two factors, *intensity* (the peak day,
+its rarity, how concentrated the rain was, its spread) and *wetness* (wet-day frequency and the year's
+total against the previous 30 years). Then:
+
+- **arousal** is the mean of the year's rank on intensity and on the anomaly score;
+- **valence** is the mean of the year's rank on its departure from a normal year (intense, very wet or very
+  dry) and on the anomaly score, reversed so the most unusual years read towards −1.
+
+Both are ranks among the 134 fitted years, with equal weights and nothing tuned, so they are relative to
+this record. Eight consistency checks were fixed in advance and are exported with the result; seven pass.
+Valence and arousal correlate at −0.71, just past the 0.70 limit the checks set, so the two axes are not
+fully independent. **This is a hypothesis, not a measurement: no participants have rated these years.**
+The designed mapping in `mapping.py` (size, tempo, texture, and the earlier valence and arousal formulas)
+is unchanged and is what produces the XR frames today.
 
 ## Human-Water Interface (in development)
 
@@ -86,16 +111,17 @@ python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data
 noea/
 ├── models.py                    shared TimeSeries and XRParameters
 ├── climate_pulse/
-│   ├── rainfall/                loaders, frameworks, anomaly, mapping, data/
+│   ├── rainfall/                loaders, frameworks, anomaly, affect, mapping, data/
 │   └── river/                   loaders, frameworks, yearly, anomaly, mapping, data/
 └── human_water_interface/       loaders, quality, baselines, anomaly, mapping, fetch
 demo_*.py                        one or more demos per module
-docs/                            introduction and its source
+docs/                            interactive page (index.html), introduction deck, and their sources
 ```
 
 In each module, `frameworks.py` is the diagnostic layer (in the Human-Water
 Interface, `quality.py` and `baselines.py`), `anomaly.py` is the learned model,
-and `mapping.py` is the curatorial layer.
+and `mapping.py` is the curatorial layer. Hong Kong's `affect.py` sits beside the anomaly
+model: it is learned from the record and feeds the interactive page.
 
 ## References
 

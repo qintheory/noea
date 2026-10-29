@@ -3,17 +3,25 @@
 One explorer per implementation (Hong Kong rainfall, Rhine and alpine rivers, L'Aire). Each shows the record, the diagnostics
 drawn from it and the learned anomaly score, and stops before the XR mapping. Everything is generated from the pipeline.
 
+For Hong Kong the page also shows a heart: one beat per year. **Colour is valence** (two colours and the gradient between them),
+**beat strength is arousal**, **beat pace is the days since the previous annual peak**, and the shape is the year's rain round a
+circle, January at the top. Valence and arousal come from `noea/climate_pulse/rainfall/affect.py`, a learned map relative to the
+record that has not been tested with viewers. The heart has three views of the same stage, **Flat**, **3D** and **Map** (every
+year as a dot on valence against arousal, the current year moving).
+
 | File | What it is |
 | --- | --- |
 | `build_explorers.py` | Computes each implementation's data and writes standalone pages and `data/*.json` |
 | `build_site.py` | Builds the combined page into `docs/` (`index.html`, `explore/`): introduction, three chapters, documentation lightbox |
 | `engine.js`, `engine.css`, `fragment.html` | The shared explorer |
+| `heart.js` | The heart (flat, 3D and map views), used by the explorer and by the stage of the combined page |
 | `site.html`, `site.js`, `site.css` | The combined page |
 
 Rebuild, from the repository root:
 
 ```bash
-python3 docs/source/explorers/build_site.py
+python3 docs/source/explorers/build_site.py            # recomputes the data (slow: it refits the Human-Water Interface model)
+python3 docs/source/explorers/build_site.py --assets   # only the page, scripts and styles, from the data already written
 ```
 
 ## Publishing
