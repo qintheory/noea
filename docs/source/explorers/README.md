@@ -26,8 +26,9 @@ python3 docs/source/explorers/build_site.py --assets   # only the page, scripts 
 
 ## Publishing
 
-GitHub Pages: Settings, Pages, deploy from branch `main`, folder `/docs`. The page is then at `https://qintheory.github.io/noea/`
-(`#atmosphere`, `#rivers`, `#laire` open a chapter directly).
+GitHub Pages is on: deploy from branch `main`, folder `/docs`. The page is live at **https://qintheory.github.io/noea/**
+(`#atmosphere`, `#rivers`, `#laire` open a chapter directly), and it updates a minute or two after each push to `main`.
+It sends no `X-Frame-Options` header, so it can be framed from meetingofwaters.org.
 
 Webflow: one Embed element holding a full-bleed iframe, the same way as the Hong Kong Heartbeat page.
 

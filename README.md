@@ -16,7 +16,7 @@ at **[meetingofwaters.org/noea](https://www.meetingofwaters.org/noea)**.
 A technical guide to the pipeline is in [`docs/introduction.html`](docs/introduction.html)
 (open it in a browser; arrow keys to move, N for notes).
 
-**Try it:** [`docs/index.html`](docs/index.html) is the interactive page: a heart that beats once
+**Try it:** [qintheory.github.io/noea](https://qintheory.github.io/noea/) is the interactive page (source: [`docs/index.html`](docs/index.html)): a heart that beats once
 for each year of Hong Kong's rainfall, with the analyses behind it, and two more prototypes
 (the Rhine and alpine rivers, L'Aire in Geneva). It is built for GitHub Pages and embeds in a web page.
 
