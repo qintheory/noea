@@ -1,0 +1,66 @@
+<div class="wrap">
+  <p class="eyebrow" id="eyebrow"></p>
+  <h1 id="title"></h1>
+  <p class="deck" id="deck"></p>
+  <section class="heart" id="heartBox" aria-label="The result" hidden></section>
+
+  <div class="steps" id="steps" role="tablist" aria-label="Pipeline stage"></div>
+  <p class="step-text" id="stepText"></p>
+
+  <div id="viewBox" hidden>
+    <p class="chips-label">View</p>
+    <div class="chips" id="views"></div>
+  </div>
+  <div id="groupBox" hidden>
+    <p class="chips-label" id="groupLabel"></p>
+    <div class="chips" id="groups"></div>
+    <p class="note" id="gNote" hidden></p>
+  </div>
+  <div id="featBox" hidden>
+    <p class="chips-label">Diagnostic</p>
+    <div class="chips" id="feats"></div>
+  </div>
+
+  <figure class="chart" id="chartBox" style="margin-left:0;margin-right:0">
+    <canvas id="main" tabindex="0" role="img"></canvas>
+    <div class="tip" id="tip" hidden></div>
+  </figure>
+  <div class="legend" id="legend" hidden><span id="lgA">typical</span><i></i><span id="lgB">most unusual</span></div>
+  <p class="hint" id="viewNote" style="margin-bottom:8px"></p>
+  <p class="step-text" id="sumLine" hidden style="min-height:0;margin-bottom:6px"></p>
+  <p class="hint" id="hint"></p>
+
+  <section class="unit" aria-live="polite">
+    <div>
+      <div class="unit-head"><span class="swatch" id="swatch"></span><h2 id="uTitle"></h2></div>
+      <p class="score-line" id="uScore"></p>
+      <p class="why" id="uWhy"></p>
+      <p class="facts" id="uFacts"></p>
+      <p class="note" id="uNote" hidden></p>
+      <table id="table">
+        <thead><tr><th>Diagnostic</th><th class="num">Value</th><th class="hide-sm">Against typical</th><th class="hide-sm">Share of misfit</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="detail">
+      <h3 id="dTitle"></h3>
+      <canvas id="detail" role="img"></canvas>
+    </div>
+  </section>
+
+  <section class="flagged">
+    <p class="chips-label" id="flagLabel"></p>
+    <div class="chips" id="flagged"></div>
+  </section>
+
+  <section class="limits">
+    <h2>What this does and does not show</h2>
+    <ul id="limits"></ul>
+  </section>
+
+  <footer>
+    <p id="method"></p>
+    <p id="source"></p>
+    <p>This page stops before the XR mapping. Valence, arousal and the other XRParameters come after this stage and are not shown.</p>
+  </footer>
+</div>

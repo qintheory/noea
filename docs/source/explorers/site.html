@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Noéa · Meeting of Waters</title>
+<meta name="description" content="Noéa reads water records the way a cardiologist reads an ECG: three interactive prototypes, from the record to the learned score, before any mapping to XR.">
+<link rel="preconnect" href="https://use.typekit.net" crossorigin>
+<link rel="stylesheet" href="https://use.typekit.net/pwm6lyt.css">
+<link rel="stylesheet" href="explore/site.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <a class="mark" href="#intro" id="markLink" aria-label="Noéa, back to the start"><span class="arrow" id="markArrow" hidden>←</span><img src="explore/noea-wordmark.png" alt="noéa" width="97" height="32"></a>
+  </header>
+
+  <main>
+    <section class="scene" id="sceneIntro" aria-label="Introduction">
+      <div class="shell stage">
+        <div class="stage-text">
+          <div class="stage-top">
+            <h1>Turning hydrological data into emotions</h1>
+            <p class="lede">Noéa reads a record like an ECG, for rhythm, memory and shock</p>
+            <p class="intro"><i>Noéa</i> has two complementary organs. <strong>Climate Pulse</strong> reads long records, from decades to two centuries of rainfall and river flow, for the rhythm and memory of a climate. The <strong>Human-Water Interface (HWI)</strong> works at the scale of one river and the people beside it, with short, fast records from a few nearby sensors.</p>
+          </div>
+          <nav class="words" id="cards" aria-label="Prototypes"></nav>
+          <div class="stage-foot">
+            <button class="solid" type="button" data-doc="intro">Documentation</button>
+          </div>
+        </div>
+        <div class="stage-art" id="hero" role="img" aria-label="A blob drawn from Hong Kong's rainfall that beats once for each year of the record, 1884 to 2025"></div>
+      </div>
+    </section>
+
+    <section class="scene" id="sceneExplore" aria-label="Prototype" hidden>
+      <div id="loading" class="loading" hidden>Loading the record…</div>
+      <div id="missing" class="missing" hidden></div>
+      <div id="explorer">
+/*__FRAGMENT__*/
+        <div class="wrap pager-wrap">
+          <div class="pager" id="pager"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="docs" id="docs" aria-label="Documentation">
+    <div class="docs-head">
+      <div class="tabs" role="tablist" aria-label="Documentation" id="docTabs"></div>
+      <button class="btn icon close" id="docClose" type="button" aria-label="Close documentation">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>
+      </button>
+    </div>
+    <div class="docs-body" id="docBody"></div>
+  </dialog>
+</div>
+<noscript><p style="padding:24px;font-family:sans-serif">This page needs JavaScript to draw its charts. The technical introduction is at <a href="introduction.html">introduction.html</a>.</p></noscript>
+<script src="explore/engine.js"></script>
+<script src="explore/heart.js"></script>
+<script src="explore/site.js"></script>
+</body>
+</html>
