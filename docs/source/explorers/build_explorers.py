@@ -107,7 +107,7 @@ def rainfall():
         f"Valence and arousal (the corner map) are relative to this record: each year is placed against its {af.n_fit} fitted years. They combine two PCA factors learned from the data, storminess and wetness, with the anomaly score, and agree with it (arousal r = {c['arousal~anomaly']:+.2f}, valence r = {c['valence~anomaly']:+.2f}). "
         f"They pass {passed} of {len(af.checks)} consistency checks fixed in advance; valence and arousal share about half their variance (r = {c['valence~arousal']:+.2f}). No viewers rated anything, so this is a hypothesis about affect, not a measurement.",
         "There are no data for 1940–1946, so the record has 135 years rather than 142. 2025 is a partial year (the data end in January): it is scored by the fitted model and never shaped it.",
-        "Years with missing days are totalled and summarised over the days that exist (n_days is between 268 and 299 for 55 of the 135 years).",
+        "From 1917 the source file leaves out about 67 days in every year. They are dry days (annual totals and wet-day counts are the same on both sides of 1917), so they are filled as 0 mm; without that, wet-day frequency would read a fifth too high from 1917 on.",
         "Nothing here has been tested with viewers. A high score means the year was unusual for this record, not that a person would feel it so.",
     ]
     return dict(kind="rain_year", views=[["line", "Timeline"]], groups=[g], features=[

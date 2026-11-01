@@ -34,8 +34,10 @@ Two layers, kept deliberately apart: a **diagnostic layer** (plain science,
 deterministic) and a **curatorial layer** (how a result should feel, designed).
 Machine learning has one job so far: an unsupervised model learns what a
 typical year looks like for each record and scores how unusual each year is.
-For Hong Kong rainfall that score also feeds a second, learned reading of valence
-and arousal (below); the river and L'Aire modules still use designed mappings.
+For Hong Kong rainfall there is a second, rolling model that reads the daily record
+in moving windows instead of whole years, and the yearly score also feeds a learned
+reading of valence and arousal (below); the river and L'Aire modules still use
+designed mappings.
 
 How people respond to the result has not been tested. That is the research.
 
@@ -56,6 +58,32 @@ worked examples, not the scope.
 
 The **Human-Water Interface** (`noea/human_water_interface/`) is the local
 counterpart, in development; see below.
+
+### Two models of the Hong Kong record: by year, and by moving window
+
+The **yearly model** ([`anomaly.py`](noea/climate_pulse/rainfall/anomaly.py)) describes each calendar year by six
+numbers, most of them tied to the year's wettest day, and scores it by PCA reconstruction error. It is the score on
+the interactive page, and valence and arousal (next section) are built on it.
+
+The **rolling model** ([`rolling.py`](noea/climate_pulse/rainfall/rolling.py)) slides a window of 30, 90 or 365 days
+along the daily record, one day at a time, and describes each window by ten local measures in the spirit of
+heart-rate variability: its total, wet share, heaviest day, spread, day-to-day change, slow against fast variability,
+longest dry and wet runs, top-three-day share, and how fast the record settles after its peak. Each measure is ranked
+among windows from the same time of year, a PCA keeps 80% of the variance, and a window is scored by its Mahalanobis
+distance in the kept components or by its reconstruction error (the larger of the two ranks at 30 days; Mahalanobis
+alone at 365). The result is a continuous trace, not one number per year. It is not on the page yet.
+
+Both are unsupervised: neither is fitted to the documented events in
+[`events.py`](noea/climate_pulse/rainfall/events.py) ([sources](docs/hk-reference-events.md)), which are used to check
+the result afterwards. Checked this way, the rolling model ranks the seven storms at a mean of 0.85 and the seven wet and
+dry years at 0.81 (0.5 is chance), with 3 and 2 of them at 0.95 or above. The score rule was chosen on half of the events
+and reported on the other half (30 days: 0.88 tune, 0.81 test; 365 days: 0.75 and 0.87), but each half has only three or
+four events, so this is a rough check, not a validation. Misses: the 1972 landslides (0.62), Severe Tropical Storm Sam
+in 1999 (0.67), and the wet year 1982 (0.45).
+
+**Missing days.** From 1917 the source file leaves out about 67 days a year. They are dry days (annual totals and
+wet-day counts match on both sides of 1917), so the loader fills them as 0 mm; without that, wet-day frequency read a
+fifth too high from 1917 on. Years with no record at all (1940–1946) stay absent.
 
 ### Valence and arousal for Hong Kong, learned from the record
 
@@ -111,7 +139,7 @@ python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data
 noea/
 ├── models.py                    shared TimeSeries and XRParameters
 ├── climate_pulse/
-│   ├── rainfall/                loaders, frameworks, anomaly, affect, mapping, data/
+│   ├── rainfall/                loaders, frameworks, anomaly, rolling, events, affect, mapping, data/
 │   └── river/                   loaders, frameworks, yearly, anomaly, regime, mapping, data/
 └── human_water_interface/       loaders, quality, baselines, anomaly, mapping, fetch
 demo_*.py                        one or more demos per module
@@ -121,7 +149,8 @@ docs/                            interactive page (index.html), introduction dec
 In each module, `frameworks.py` is the diagnostic layer (in the Human-Water
 Interface, `quality.py` and `baselines.py`), `anomaly.py` is the learned model,
 and `mapping.py` is the curatorial layer. Hong Kong's `affect.py` sits beside the anomaly
-model: it is learned from the record and feeds the interactive page. The rivers use `regime.py`
+model: it is learned from the record and feeds the interactive page. `rolling.py` is the
+second, moving-window model; `events.py` holds the documented events both are checked against. The rivers use `regime.py`
 instead of `anomaly.py`: each year is read against the station's own typical year, and the score is the
 share of the station's years that are less unusual.
 
