@@ -76,6 +76,8 @@ window.NOEA_SITE = true;
     $("explorer").hidden = true; $("missing").hidden = true; $("loading").hidden = false;
     try {
       if (!cache[ch.key]) { const r = await fetch("explore/data/" + ch.file); if (!r.ok) throw new Error(r.status); cache[ch.key] = await r.json(); }
+      if (cache.windows === undefined) { try { const r = await fetch("explore/data/windows.json"); cache.windows = r.ok ? await r.json() : null; } catch (e) { cache.windows = null; } }   // the moving-window traces are optional
+      if (cache.windows && cache.windows[ch.key]) cache[ch.key].win = { step: cache.windows.step, lengths: cache.windows.lengths, records: cache.windows[ch.key] };
     } catch (e) {
       if (my !== token) return;
       $("loading").hidden = true; $("missing").hidden = false;

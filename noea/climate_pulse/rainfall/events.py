@@ -5,18 +5,9 @@ storms are checked with 30-day windows, wet and dry years with 365-day windows. 
 advance (alternating down the list), so a setting chosen on one half can be tested on the other.
 """
 from __future__ import annotations
-from dataclasses import dataclass
 from datetime import date
 
-
-@dataclass(frozen=True)
-class Event:
-    label: str
-    kind: str          # "wet" or "dry"
-    start: date
-    end: date
-    scale: int         # days
-    group: str         # "tune" or "test"
+from ..windows import Event
 
 
 def _year(y: int) -> tuple[date, date]:

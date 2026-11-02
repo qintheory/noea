@@ -14,10 +14,13 @@ The Rhine and alpine rivers chapter is laid out the same way. The result is on t
 | File | What it is |
 | --- | --- |
 | `build_explorers.py` | Computes each implementation's data and writes standalone pages and `data/*.json` |
+| `build_windows.py` | Computes the rolling-window traces (Hong Kong and the eight stations, at 30, 90 and 365 days) and writes `docs/explore/data/windows.json`; slow (about ten minutes), so it is run apart from the rest |
 | `build_site.py` | Builds the combined page into `docs/` (`index.html`, `explore/`): introduction, three chapters, documentation lightbox |
 | `engine.js`, `engine.css`, `fragment.html` | The shared explorer |
 | `heart.js` | The heart (flat, 3D and map views), used by the explorer and by the stage of the combined page |
 | `site.html`, `site.js`, `site.css` | The combined page |
+
+The **Moving windows** figure under each Atmosphere and Rivers chart reads `explore/data/windows.json` at run time; the page works without it (the figure is simply hidden).
 
 Rebuild, from the repository root:
 

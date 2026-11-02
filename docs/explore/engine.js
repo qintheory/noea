@@ -57,6 +57,7 @@ function drawMain() {
   if (P.body) drawRiver();
   if (!$("main").clientWidth) return;
   if (P.kind === "river_year" && st.step === 1) return drawFramework();
+  if (P.kind === "river_year" && st.step === 2) return drawScore();
   if (st.view === "ribbon") return drawRibbon();
   if (P.kind === "rain_year" && st.view === "line") return st.step === 0 ? drawRecordEcg() : drawEcg();
   const { x, w, h } = setup($("main"));
@@ -526,6 +527,47 @@ function flowCtx(g, i) {          // the year's flow in plain words, so a score 
   return "mean flow " + v.toFixed(2) + " × its average" + (v < 0.9 ? " (below average)" : v > 1.1 ? " (above average)" : "");
 }
 function whyText(g, i) { const c = flowCtx(g, i), kd = kindOf(g, i); return (c ? "\n" + c : "") + (kd ? "\nmost unusual for: " + kd : ""); }
+/* ---------- the score, per station: a line for each year, coloured by what departed most (rivers, Score step) ---------- */
+const SCORE_FLOOR = 0.7;          // only the top 30% of a station's years are drawn tall; the rest are a dot on the baseline
+const SCORE_NOTE = "Each panel is one station. A line is a year, as tall as it is unusual for that station, from the 70th to the 100th percentile; the dashed line is the top 10%. Colour is what departed most: more water (blue), less water (gold) or a different rhythm, meaning flashiness, recession or season (teal). The dark ring is the chosen year.";
+function kindClass(g, i) {          // 0 more water, 1 less water, 2 a different rhythm: from the measure that departs most
+  const k = P.groups[g]; let b = -1, bv = -1; k.z.forEach((c, j) => { if (c[i] !== null && Math.abs(c[i]) > bv) { bv = Math.abs(c[i]); b = j; } });
+  return b < 0 || b >= 3 ? 2 : k.z[b][i] >= 0 ? 0 : 1;
+}
+function drawScore() {
+  const { x, w } = setup($("main")); RIB = RIB || buildRibbon();
+  const L = frameLayout(w), gap = 16, pw0 = (w - (L.cols - 1) * gap) / L.cols, ink = css("--ink"), muted = css("--muted"), rule = css("--rule"), KC = [css("--c3"), css("--gold"), "#2f9a8f"];
+  x.textBaseline = "middle"; x.textAlign = "left"; x.fillStyle = ink; x.font = "700 13px " + FONT; x.fillText("The score · " + (st.by !== undefined ? st.by : label(st.sel)), 4, 14);
+  x.font = "12px " + FONT; x.fillStyle = muted; x.fillText("each line is a year; its height is how unusual it was for the station · colour: what departed most", 4, 33);
+  const panels = [];
+  P.bands[st.fg || 0].layers.forEach((g, pi) => {
+    const k = P.groups[g], c = pi % L.cols, rr = Math.floor(pi / L.cols), X0 = c * (pw0 + gap), Y0 = L.top + rr * L.rowH, sel = g === st.g, ml = 36, pw = pw0 - ml - 14, py0 = Y0 + 20, ph = L.plotH, py1 = py0 + ph;
+    const fit = k.labels.map((_, j) => j).filter(j => k.fit[j] && k.labels[j] >= RIB.y0 && k.labels[j] <= RIB.y1), yi = gIdx(k, st.by), bw = pw / Math.max(1, RIB.y1 - RIB.y0 + 1);
+    const xv = (j) => X0 + ml + (k.labels[j] - RIB.y0 + 0.5) * bw, yv = (u) => py1 - Math.max(0, (u - SCORE_FLOOR) / (1 - SCORE_FLOOR)) * ph;
+    x.font = (sel ? "700 " : "400 ") + "12px " + FONT; x.fillStyle = sel ? ink : muted; x.textAlign = "left"; x.fillText(k.short || k.name, X0 + 2, Y0 + 8);
+    if (yi !== null && k.fit[yi]) { x.font = "11px " + FONT; x.fillStyle = muted; x.textAlign = "right"; x.fillText(unusualText(k.norm[yi], true), X0 + pw0 - 12, Y0 + 8); }
+    x.strokeStyle = sel ? ink : rule; x.lineWidth = sel ? 1.4 : 1; x.strokeRect(X0 + ml + 0.5, py0 + 0.5, pw, ph);
+    x.font = "10px " + FONT; x.fillStyle = muted; x.textAlign = "right"; [[0.7, "70%"], [0.85, "85%"], [1, "100%"]].forEach(([u, t]) => { const yy = yv(u); x.fillText(t, X0 + ml - 4, Math.min(py1 - 4, Math.max(py0 + 5, yy))); });
+    { const stp = RIB.y1 - RIB.y0 > 120 ? 50 : 20; x.font = "10px " + FONT; x.fillStyle = muted; x.textAlign = "center"; for (let yr = Math.ceil(RIB.y0 / stp) * stp; yr <= RIB.y1; yr += stp) x.fillText(String(yr), X0 + ml + (yr - RIB.y0 + 0.5) * bw, py1 + 11); }
+    x.strokeStyle = ink; x.globalAlpha = 0.55; x.setLineDash([3, 3]); x.lineWidth = 1; x.beginPath(); x.moveTo(X0 + ml, yv(0.9)); x.lineTo(X0 + ml + pw, yv(0.9)); x.stroke(); x.setLineDash([]); x.globalAlpha = 1;
+    const tall = [];
+    fit.forEach(j => { const u = k.norm[j]; if (u < SCORE_FLOOR) { x.fillStyle = rule; x.fillRect(xv(j) - bw * 0.3, py1 - 2, Math.max(1, bw * 0.6), 2); return; }
+      x.strokeStyle = KC[kindClass(g, j)]; x.lineWidth = Math.max(1.2, bw * 0.6); x.globalAlpha = u >= 0.9 ? 1 : 0.55; x.beginPath(); x.moveTo(xv(j), py1); x.lineTo(xv(j), yv(u)); x.stroke(); x.globalAlpha = 1; tall.push(j); });
+    x.font = "700 10px " + FONT; x.fillStyle = ink; x.textAlign = "center"; const used = [];
+    tall.slice().sort((a, b) => k.norm[b] - k.norm[a]).slice(0, 3).forEach(j => { if (used.some(q => Math.abs(q - xv(j)) < 26)) return; used.push(xv(j)); x.fillText(String(k.labels[j]), Math.min(Math.max(xv(j), X0 + ml + 14), X0 + ml + pw - 14), Math.max(py0 - 6, yv(k.norm[j]) - 7)); });
+    if (yi !== null && k.fit[yi] && k.labels[yi] >= RIB.y0 && k.labels[yi] <= RIB.y1) { x.strokeStyle = ink; x.lineWidth = 1.6; x.beginPath(); x.arc(xv(yi), yv(k.norm[yi]), 4.5, 0, 6.2832); x.stroke(); }
+    else if (yi === null) { x.font = "italic 11px " + FONT; x.fillStyle = muted; x.textAlign = "center"; x.fillText("no record in " + st.by, X0 + ml + pw / 2, py0 + ph / 2); }
+    if (st.hoverG === g && !sel) { x.strokeStyle = ink; x.globalAlpha = 0.5; x.lineWidth = 1.2; x.strokeRect(X0 + ml + 0.5, py0 + 0.5, pw, ph); x.globalAlpha = 1; }
+    panels.push({ g, X0, Y0, w: pw0, h: 20 + ph + 24, xs: fit.map(j => ({ j, x: xv(j) })), bw });
+  });
+  plot = { score: { panels } };
+}
+function scoreHit(px, py) {
+  const q = plot && plot.score; if (!q) return null; const p = q.panels.find(a => px >= a.X0 && px <= a.X0 + a.w && py >= a.Y0 && py <= a.Y0 + a.h); if (!p) return null;
+  const k = P.groups[p.g]; let i = gIdx(k, st.by), bd = 1e9; p.xs.forEach(b => { const d = Math.abs(px - b.x); if (d < bd) { bd = d; if (bd < Math.max(7, p.bw)) i = b.j; } });
+  if (i === null || i === undefined) return { g: p.g, i: null, tip: (k.short || k.name) + " · no record in " + st.by };
+  return { g: p.g, i, tip: (k.short || k.name) + " · " + k.labels[i] + " · " + (k.fit[i] ? unusualText(k.norm[i]) + whyText(p.g, i) : "not fitted") };
+}
 function stationAt(px, py) { const q = plot && plot.rib; if (!q || !q.labels || px < 0 || px > q.ml) return null; return q.labels.find(l => py >= l.y0 && py <= l.y1) || null; }
 function stationInfo(g) {
   const k = P.groups[g];
@@ -542,6 +584,7 @@ function ribbonHit(px, py) {
 function hitAt(e) {
   const r = $("main").getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
   if (P.kind === "river_year" && st.step === 1) return frameHit(px, py);
+  if (P.kind === "river_year" && st.step === 2) return scoreHit(px, py);
   if (st.view === "ribbon") return ribbonHit(px, py);
   if (P.kind === "rain_year" && st.view === "line") return st.step > 0 ? ecgHit(px) : recHit(px);
   if (!plot || !plot.pw || px < plot.ml || px > plot.ml + plot.pw) return null;
@@ -566,7 +609,7 @@ function viewNotes() { return {
 }; }
 function sizeCanvas() {
   const c = $("main"), w = c.parentElement.clientWidth;
-  c.style.height = (P.kind === "river_year" && st.step === 1 ? frameLayout(w).height : st.view === "ribbon" ? (P.bands ? (w < 560 ? 430 : 480) : 320) : 320) + "px";
+  c.style.height = (P.kind === "river_year" && (st.step === 1 || st.step === 2) ? frameLayout(w).height : st.view === "ribbon" ? (P.bands ? (w < 560 ? 430 : 480) : 320) : 320) + "px";
 }
 function setView(v) {
   st.view = v; st.hover = null; st.hoverG = null;
@@ -695,24 +738,25 @@ function setStep(s) {
   document.querySelectorAll(".step").forEach((b, k) => b.setAttribute("aria-selected", String(k === s)));
   $("stepText").textContent = P.steps[s][1];
   const rich = st.view !== "line";
-  const yr = P.kind === "river_year" && st.view === "ribbon" && s !== 1;
-  $("featBox").hidden = s !== 1; $("legend").hidden = !(s === 2 || (rich && s === 1 && P.kind !== "river_year") || yr); $("sumLine").hidden = s !== 2;
+  const yr = P.kind === "river_year" && st.view === "ribbon" && s === 0, sc = P.kind === "river_year" && s === 2;
+  $("featBox").hidden = s !== 1; $("legend").hidden = !((s === 2 && P.kind !== "river_year") || (rich && s === 1 && P.kind !== "river_year") || yr); $("sumLine").hidden = s !== 2;
   $("lgA").textContent = yr && s === 0 ? "low flow" : P.kind === "river_year" && s === 2 ? "an ordinary year" : "typical"; $("lgB").textContent = yr && s === 0 ? "high flow" : s === 1 ? "far from typical" : P.kind === "river_year" ? "among its most unusual years" : "most unusual";
-  $("barKey").hidden = !yr;
-  if (P.kind === "river_year") $("groupBox").hidden = s !== 1;
+  $("barKey").hidden = !(yr || sc);
+  if (P.kind === "river_year") $("groupBox").hidden = s === 0;
   if (P.windows) $("viewBox").hidden = s === 1 && st.f > 2;          // the window only matters for the graphs drawn over the years
   if (yr) { $("bkText").textContent = s === 0 ? "Height and colour both show the year's mean flow, for visual effect: tall and navy for a high-flow year, short and pale for a low-flow year, measured against that station's own average. Grey: no record that year."
     : "Bar height: the year's mean flow as a multiple of that station's own average, so 1.0 is an average year. " + (s === 1 ? "Colour: how far the year is from typical on the chosen diagnostic." : "Colour: how unusual the year is for this station, from pale (an ordinary year) to navy (among its most unusual, the top few percent). It does not say which way, so hover a bar to see the year's flow and what makes it unusual. Gold outline: the station's most unusual year.") + " Grey: no record that year.";
     document.querySelector("#barKey .bkscale").style.display = s === 0 ? "none" : ""; }
-  $("viewNote").textContent = P.kind === "river_year" && s === 1 ? FRAMES[st.f].note : rich ? viewNotes()[st.view][s] + (st.view === "ribbon" && P.bands && P.bands.some(b => b.fill) ? " The Rhine keeps its full thickness as one continuous river; the alpine streams are separate lanes, not one body." : "") : "";
+  if (sc) { $("bkText").textContent = "Height: how unusual the year was for this station. Colour: what departed most, more water (blue), less water (gold) or a different rhythm (teal). It says how far and what kind, never how a person would feel it."; document.querySelector("#barKey .bkscale").style.display = "none"; }
+  $("viewNote").textContent = P.kind === "river_year" && s === 1 ? FRAMES[st.f].note : P.kind === "river_year" && s === 2 ? SCORE_NOTE : rich ? viewNotes()[st.view][s] + (st.view === "ribbon" && P.bands && P.bands.some(b => b.fill) ? " The Rhine keeps its full thickness as one continuous river; the alpine streams are separate lanes, not one body." : "") : "";
   const sm = G.summary, vr = Math.round(sm.variance * 100) + "%";
   $("sumLine").textContent = isDay
     ? sm.components + " components keep " + vr + " of the variance in " + sm.n_fit.toLocaleString("en-GB") + " fitting days. Of the " + sm.n_test.toLocaleString("en-GB") + " held-out days, " + (sm.test_above_p95 * 100).toFixed(1) + "% score above the training 95th percentile (5% expected if nothing had changed) and " + (sm.test_above_p99 * 100).toFixed(1) + "% above the 99th (1% expected)."
     : sm.components + " components keep " + vr + " of the variance in the " + sm.n_fit + " fitted years" + (P.groups.length > 1 ? " of this station." : ".");
   document.querySelectorAll("#feats .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(k === st.f)));
   $("main").setAttribute("aria-label", P.steps[s][0] + ": " + P.steps[s][1]);
-  $("hint").textContent = P.kind === "river_year" && s === 1 ? "Pick a measure above. Choose the stations above. Click a panel to select that station" + (st.f <= 2 ? ", or a bar to choose that year" : "") + "; the year also follows the slider on the river." : (P.kind === "river_year" ? "Hover a station name for its details; click it to choose that station. " : "") + "Click a " + (st.view === "ring" ? "filament" : st.view === "ribbon" ? (isDay ? "week" : "layer") : P.unit) + " to inspect it. Arrow keys step by one " + P.unit + (isDay ? ", Shift for a month." : ", Shift for ten.");
-  drawMain(); renderUnit();
+  $("hint").textContent = P.kind === "river_year" && s === 2 ? "Choose the stations above. Click a panel to select that station, or a line to choose that year; the year also follows the slider on the river." : P.kind === "river_year" && s === 1 ? "Pick a measure above. Choose the stations above. Click a panel to select that station" + (st.f <= 2 ? ", or a bar to choose that year" : "") + "; the year also follows the slider on the river." : (P.kind === "river_year" ? "Hover a station name for its details; click it to choose that station. " : "") + "Click a " + (st.view === "ring" ? "filament" : st.view === "ribbon" ? (isDay ? "week" : "layer") : P.unit) + " to inspect it. Arrow keys step by one " + P.unit + (isDay ? ", Shift for a month." : ", Shift for ten.");
+  drawMain(); renderUnit(); mwMount();
 }
 function markFrameChips() { document.querySelectorAll("#groups .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(P.kind === "river_year" ? k === (st.fg || 0) : false))); }
 function setFrameGroup(k) {
@@ -727,12 +771,72 @@ function setGroup(g, keep) {
   else document.querySelectorAll("#groups .chip").forEach((b, k) => b.setAttribute("aria-pressed", String(k === g)));
   renderFlagged(); setStep(st.step);
 }
-function select(i) { if (i === null || i === undefined) return; st.sel = i; if (P.kind === "river_year") st.by = G.labels[i]; if (heart && heart.year() !== i) heart.go(i, true, true); drawMain(); renderUnit(); }
+function select(i) { if (i === null || i === undefined) return; st.sel = i; if (P.kind === "river_year") st.by = G.labels[i]; if (heart && heart.year() !== i) heart.go(i, true, true); drawMain(); renderUnit(); mwDraw(); }
 function renderFlagged() {
   $("flagLabel").textContent = isDay ? "Highest-scoring days in the held-out years (2023–2025)" : "Highest-scoring " + P.unit_plural + (P.windows ? " in this window" : " in this record");
   $("flagged").innerHTML = (P.windows ? topIn(G, 6) : G.top).map(i => '<button class="chip" data-i="' + i + '">' + label(i) + '</button>').join("");
   document.querySelectorAll("#flagged .chip").forEach(b => b.onclick = () => select(+b.dataset.i));
 }
+/* ---------- moving windows: the score of a window sliding along the daily record (windows.json) ---------- */
+const MW_WORDS = { 30: "a month", 90: "a season", 365: "a year" };
+let MWS = { len: 30, geo: null };
+function mwRec() { return P && P.win && P.win.records && P.win.records[G.id] ? P.win.records[G.id] : null; }
+const mwDay = (s) => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+function mwMount() {
+  const rec = mwRec(), box = $("mwBox"); box.hidden = !rec; if (!rec) return;
+  const lens = P.win.lengths.filter(L => rec[L]);
+  if (!lens.includes(MWS.len)) MWS.len = lens[0];
+  $("mwLens").innerHTML = lens.map(L => '<button class="chip" data-l="' + L + '" aria-pressed="' + (L === MWS.len) + '">' + L + ' days</button>').join("");
+  document.querySelectorAll("#mwLens .chip").forEach(b => b.onclick = () => { MWS.len = +b.dataset.l; mwMount(); });
+  const ev = rec[MWS.len].events || [], mean = ev.length ? ev.reduce((a, e) => a + e.pct, 0) / ev.length : null, hi = ev.filter(e => e.pct >= 0.95).length;
+  $("mwText").textContent = "Instead of one number per year, a window of " + MWS.len + " days (" + MW_WORDS[MWS.len] + ") slides along the daily record, one day at a time. Each window is described by ten local measures, in the spirit of heart-rate variability: its level, its spread, how fast it changes from day to day, how it settles after its peak. Height is how rare the window was for this time of year: 1 means one window in ten was as unusual, 2 one in a hundred, 3 one in a thousand.";
+  const pool = Object.values(P.win.records).flatMap(q => (q[MWS.len] && q[MWS.len].events) || []), pm = pool.length ? pool.reduce((a, e) => a + e.pct, 0) / pool.length : null, ph = pool.filter(e => e.pct >= 0.95).length, several = Object.keys(P.win.records).length > 1;
+  const mine = ev.map(e => e.label + ": above " + Math.round(e.pct * 100) + "%").join("; ");
+  $("mwNote").textContent = (ev.length ? "Gold marks " + (ev.length === 1 ? "a documented event" : ev.length + " documented events") + " here (" + mine + " of other spans of its length). " : "No documented event is on record for this station at this length. ")
+    + "The model was never told about any of them. " + (pool.length ? "Checked afterwards, " + (several ? "the " + pool.length + " documented events at this length across all stations" : "the " + pool.length + " at this length") + " rank at a mean of " + pm.toFixed(2) + " (0.5 is chance), " + ph + " of " + pool.length + " at 0.95 or above. A rough check on a few events, not a validation." : "");
+  mwDraw();
+}
+function mwDraw() {
+  const rec = mwRec(); if (!rec || !$("mw").clientWidth) return;
+  const r = rec[MWS.len], { x, w, h } = setup($("mw")), ink = css("--ink"), muted = css("--muted"), rule = css("--rule"), gold = css("--gold");
+  const ml = 68, mr = 12, mt = 30, mb = 24, pw = w - ml - mr, ph = h - mt - mb, UMAX = 4;
+  const all = P.win.lengths.filter(L => rec[L]);
+  const t0 = Math.min(...all.map(L => mwDay(rec[L].s))), t1 = Math.max(...all.map(L => mwDay(rec[L].s) + rec[L].v.length * P.win.step * 864e5));
+  const xt = (t) => ml + (t - t0) / (t1 - t0) * pw, yv = (v) => mt + ph - Math.min(v, UMAX) / UMAX * ph;
+  x.textBaseline = "middle"; x.font = "11px " + FONT; x.textAlign = "right"; x.fillStyle = muted;
+  [[0, "typical"], [1, "1 in 10"], [2, "1 in 100"], [3, "1 in 1,000"]].forEach(([v, t]) => { x.strokeStyle = rule; x.lineWidth = 1; x.beginPath(); x.moveTo(ml, Math.round(yv(v)) + .5); x.lineTo(ml + pw, Math.round(yv(v)) + .5); x.stroke(); x.fillText(t, ml - 6, Math.min(Math.max(yv(v), mt + 5), mt + ph - 4)); });
+  const y0 = new Date(t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear(), stp = y1 - y0 > 150 ? 50 : y1 - y0 > 90 ? 20 : 10;
+  x.textAlign = "center"; for (let y = Math.ceil(y0 / stp) * stp; y <= y1; y += stp) x.fillText(String(y), xt(Date.UTC(y, 0, 1)), h - 9);
+  if (!isDay && st.sel !== undefined && G.labels[st.sel]) { const a = xt(Date.UTC(G.labels[st.sel], 0, 1)), b = xt(Date.UTC(G.labels[st.sel] + 1, 0, 1)); x.fillStyle = muted; x.globalAlpha = .16; x.fillRect(a, mt, Math.max(2, b - a), ph); x.globalAlpha = 1; }
+  const ev = r.events || [];
+  ev.forEach(e => { if (mwDay(e.end) - mwDay(e.start) > 100 * 864e5) { x.fillStyle = gold; x.globalAlpha = .13; x.fillRect(xt(mwDay(e.start)), mt, Math.max(2, xt(mwDay(e.end)) - xt(mwDay(e.start))), ph); x.globalAlpha = 1; } });
+  const bw = Math.max(1, pw / r.v.length), base = mwDay(r.s), pts = [];
+  r.v.forEach((c, k) => { if (c === null) return; const v = c / 100, xx = xt(base + k * P.win.step * 864e5); x.fillStyle = ramp(Math.max(0, Math.min(1, (v - 0.7) / 2.3))); x.globalAlpha = v >= 1.3 ? 1 : .55; x.fillRect(xx, yv(v), bw, mt + ph - yv(v)); pts.push({ k, xx, v }); });
+  x.globalAlpha = 1;
+  const marks = [];
+  ev.forEach(e => { const t = mwDay(e.peak), xx = xt(t); x.fillStyle = gold; x.strokeStyle = ink; x.lineWidth = 1; x.beginPath(); x.moveTo(xx, mt - 14); x.lineTo(xx + 5, mt - 9); x.lineTo(xx, mt - 4); x.lineTo(xx - 5, mt - 9); x.closePath(); x.fill(); x.stroke(); marks.push({ x: xx, e }); });
+  x.textAlign = "left"; x.fillStyle = muted; x.fillText("how rare the window ending that week was · the highest of the week", ml, 10);
+  MWS.geo = { ml, pw, mt, ph, t0, t1, base, pts, marks, bw };
+  $("mw").setAttribute("aria-label", "Rolling " + MWS.len + "-day window score for " + (G.short || G.name) + ", " + y0 + " to " + y1);
+}
+function mwTipAt(px, py) {
+  const g = MWS.geo, rec = mwRec(); if (!g || !rec) return null;
+  const m = g.marks.find(a => Math.abs(px - a.x) < 8 && py < g.mt + 4);
+  if (m) return { x: m.x, text: m.e.label + " · " + new Date(mwDay(m.e.peak)).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }) + " · ranks above " + Math.round(m.e.pct * 100) + "% of other spans of its length" };
+  if (px < g.ml || px > g.ml + g.pw) return null;
+  let b = null, bd = 1e9; g.pts.forEach(p => { const d = Math.abs(px - (p.xx + g.bw / 2)); if (d < bd) { bd = d; b = p; } }); if (!b || bd > 12) return null;
+  const t = g.base + b.k * P.win.step * 864e5;
+  return { x: b.xx, t, text: "Week of " + new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) + " · " + (b.v >= 1 ? "about 1 window in " + Math.round(Math.pow(10, b.v)).toLocaleString("en-GB") + " was this unusual" : "an ordinary window") };
+}
+function mwBoot() {
+  const c = $("mw"), tip = $("mwTip");
+  c.addEventListener("pointermove", (e) => { const r = c.getBoundingClientRect(), hit = mwTipAt(e.clientX - r.left, e.clientY - r.top);
+    if (!hit) { tip.hidden = true; return; } tip.textContent = hit.text; tip.hidden = false; tip.style.left = Math.min(Math.max(hit.x, 120), r.width - 120) + "px"; tip.style.top = Math.max(e.clientY - r.top - 10, 24) + "px"; });
+  c.addEventListener("pointerleave", () => { tip.hidden = true; });
+  c.addEventListener("click", (e) => { const r = c.getBoundingClientRect(), hit = mwTipAt(e.clientX - r.left, e.clientY - r.top); if (!hit || hit.t === undefined || isDay) return;
+    const i = G.labels.indexOf(new Date(hit.t).getUTCFullYear()); if (i >= 0) select(i); });
+}
+
 function start(data) {
   P = data; prepare();
   st = { g: 0, step: 0, f: 0, sel: 0, win: 0, fg: 0, hover: null, hoverG: null, bhoverG: null, view: (P.views || [["line"]])[0][0] };
@@ -796,5 +900,6 @@ function boot() {
     let i = st.sel + k * (e.shiftKey ? (isDay ? 30 : 10) : 1); i = Math.min(G.n - 1, Math.max(0, i));
     const v = nearestValid(i); if (v !== null) select(v);
   });
-  new ResizeObserver(() => { if (!$("main").clientWidth || !P) return; sizeCanvas(); drawMain(); drawDetail(); }).observe(document.querySelector(".wrap"));
+  new ResizeObserver(() => { if (!$("main").clientWidth || !P) return; sizeCanvas(); drawMain(); drawDetail(); mwDraw(); }).observe(document.querySelector(".wrap"));
+  mwBoot();
 }

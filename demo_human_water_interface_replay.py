@@ -1,7 +1,9 @@
 """
 Human-Water Interface: replay L'Aire through the curatorial layer, three gauges.
 
-Run (after the fetches described in demo_human_water_interface_model.py, plus hourly flow for CS_ and BS_):
+Run (after fetching the OCEau history, with hourly flow for each gauge):
+      python3 -m noea.human_water_interface.fetch                            # daily history, once
+      python3 -m noea.human_water_interface.fetch PR_ flow hourly 2014 2025  # hourly flow; repeat for CS_ and BS_
       python3 demo_human_water_interface_replay.py
 
 Fits a day-level model per gauge on 2014-2022, maps every day it can score to XRParameters, checks the whole

@@ -40,6 +40,8 @@ button:focus-visible, canvas:focus-visible { outline: 2px solid var(--focus); ou
 .legend { font-family: var(--title); display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
 .legend i { display: block; width: 160px; height: 10px; border-radius: 0; background: linear-gradient(90deg, var(--c0), var(--c1), var(--c2), var(--c3), var(--c4)); }
 .hint { font-size: 13px; color: var(--muted); margin: 0 0 26px; }
+.mw { margin: 0 0 30px; }
+.mw h2 { margin: 0 0 8px; }
 .unit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px 36px; margin: 0 0 30px; }
 @media (min-width: 860px) { .unit { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); } }
 .unit-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 4px; }

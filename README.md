@@ -71,7 +71,7 @@ heart-rate variability: its total, wet share, heaviest day, spread, day-to-day c
 longest dry and wet runs, top-three-day share, and how fast the record settles after its peak. Each measure is ranked
 among windows from the same time of year, a PCA keeps 80% of the variance, and a window is scored by its Mahalanobis
 distance in the kept components or by its reconstruction error (the larger of the two ranks at 30 days; Mahalanobis
-alone at 365). The result is a continuous trace, not one number per year. It is not on the page yet.
+alone at 365). The result is a continuous trace, not one number per year, drawn on the Atmosphere and Rivers pages under "Moving windows".
 
 Both are unsupervised: neither is fitted to the documented events in
 [`events.py`](noea/climate_pulse/rainfall/events.py) ([sources](docs/hk-reference-events.md)), which are used to check
@@ -81,9 +81,22 @@ and reported on the other half (30 days: 0.88 tune, 0.81 test; 365 days: 0.75 an
 four events, so this is a rough check, not a validation. Misses: the 1972 landslides (0.62), Severe Tropical Storm Sam
 in 1999 (0.67), and the wet year 1982 (0.45).
 
+The **river rolling model** ([`river/rolling.py`](noea/climate_pulse/river/rolling.py)) does the same for each of the
+eight stations, with ten river measures (level, peak, low, spread, day-to-day change, slow against fast variability,
+trend through the window, recession after the peak, top-three-day share, settling time). The ranking, PCA and scoring
+are shared with Hong Kong in [`windows.py`](noea/climate_pulse/windows.py). It is checked against sixteen documented
+floods and droughts ([`river/events.py`](noea/climate_pulse/river/events.py), [sources](docs/river-reference-events.md)),
+with the Mahalanobis score chosen on half of them: the ten floods at 30 days rank at a mean of 0.92 (7 of 10 at 0.95 or
+above; Köln's January 1995 flood at 0.74 is the weak one), the four summer and autumn droughts at 90 days at 0.77 (none
+at 0.95), and the two dry years at 365 days at 0.92. Droughts are caught less well than floods, and Lobith 2003 and 2018
+(0.67, 0.70) least. Again a rough check: one to five events in each half.
+
 **Missing days.** From 1917 the source file leaves out about 67 days a year. They are dry days (annual totals and
 wet-day counts match on both sides of 1917), so the loader fills them as 0 mm; without that, wet-day frequency read a
 fifth too high from 1917 on. Years with no record at all (1940–1946) stay absent.
+
+The traces are computed by `python3 docs/source/explorers/build_windows.py` (about ten minutes) into
+`docs/explore/data/windows.json`; see [`docs/source/explorers/README.md`](docs/source/explorers/README.md).
 
 ### Valence and arousal for Hong Kong, learned from the record
 
@@ -130,7 +143,7 @@ Needs Python with numpy, scipy and scikit-learn.
 python3 demo_climate_pulse_rainfall.py   # Hong Kong rainfall
 python3 demo_climate_pulse_river.py      # eight river stations
 python3 demo.py                          # river, synthetic data
-python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data
+python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data (see the script's header)
 ```
 
 ## Layout
@@ -139,8 +152,9 @@ python3 demo_human_water_interface_replay.py   # L'Aire, after fetching the data
 noea/
 ├── models.py                    shared TimeSeries and XRParameters
 ├── climate_pulse/
+│   ├── windows.py               the shared rolling-window machinery (ranking, PCA, scoring, event check)
 │   ├── rainfall/                loaders, frameworks, anomaly, rolling, events, affect, mapping, data/
-│   └── river/                   loaders, frameworks, yearly, anomaly, regime, mapping, data/
+│   └── river/                   loaders, frameworks, yearly, anomaly, regime, rolling, events, mapping, data/
 └── human_water_interface/       loaders, quality, baselines, anomaly, mapping, fetch
 demo_*.py                        one or more demos per module
 docs/                            interactive page (index.html), introduction deck, and their sources
@@ -150,7 +164,7 @@ In each module, `frameworks.py` is the diagnostic layer (in the Human-Water
 Interface, `quality.py` and `baselines.py`), `anomaly.py` is the learned model,
 and `mapping.py` is the curatorial layer. Hong Kong's `affect.py` sits beside the anomaly
 model: it is learned from the record and feeds the interactive page. `rolling.py` is the
-second, moving-window model; `events.py` holds the documented events both are checked against. The rivers use `regime.py`
+second, moving-window model; `events.py` holds the documented events it is checked against, in both modules. The rivers use `regime.py`
 instead of `anomaly.py`: each year is read against the station's own typical year, and the score is the
 share of the station's years that are less unusual.
 
