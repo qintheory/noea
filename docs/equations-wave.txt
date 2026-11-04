@@ -1,0 +1,29 @@
+                      z = (x − μ) / σ
+                               C = ZᵀZ / n,   C vⱼ = λⱼ vⱼ
+                                      Z = U Σ Vᵀ,   λⱼ = Σⱼ² / n
+                                           ẑ = Z Vₖ Vₖᵀ
+                                            e = ‖ z − ẑ ‖² = Σᵢ (zᵢ − ẑᵢ)²
+                                         s = (e − e_min) / (e_max − e_min)
+                                   P(R′ ≥ r) = 1 − exp( −exp( −(r − μ) / β ) )
+                           T = 1 / P
+                 pᵢ = ( rank(xᵢ) − ½ ) / n
+         uᵢ = Φ⁻¹(pᵢ),  clipped to [−3.5, 3.5]
+   C = U − ū
+k = min { k : Σⱼ≤ₖ λⱼ / Σⱼ λⱼ ≥ 0.80 }
+ t = C Vₖ
+      d² = Σⱼ≤ₖ tⱼ² / λⱼ
+             e = ‖ C − t Vₖᵀ ‖²
+                      r = ( rank(d²) − ½ ) / N
+                               u = −log₁₀(1 − r)
+                                      score = max( rank(d²), rank(e) )
+                                           score = rank(d²)
+                                            departure = √( max(storminess, 0)² + wetness² )
+                                         pct(v) = ( rank(v) − ½ ) / n
+                                   A = ½ ( pct(storminess) + pct(anomaly) )
+                           V = 1 − 2 · pct( ½ ( pct(departure) + pct(anomaly) ) )
+                 m(d) = median of log₁₀ Q over the fitting years, ±15 days
+         σ(d) = max( stdev of that pool, 0.05 )
+   a = log₁₀ Q − m(d)
+z = a / σ(d)
+ e = ‖ z − ẑ ‖²,  k = 3
+      share of held-out days with e above the training p95 ≈ 0.05

@@ -1,6 +1,6 @@
 # Rhine and alpine reference events
 
-Documented floods and droughts used to CHECK the river models, never to fit them. Sixteen events at eight stations, in
+Documented floods and droughts used to CHECK the river models, never to fit them. Sixteen events at seven stations (Basel has none), in
 `noea/climate_pulse/river/events.py`. Each is labelled "tune" or "test" (alternating down the floods and down the
 droughts), fixed in advance. The rolling model's score rule was chosen on the "tune" half only and reported on the "test"
 half; with one to five events per window length in each half this is a rough check, not a validation.

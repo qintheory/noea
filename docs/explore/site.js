@@ -5,9 +5,9 @@ window.NOEA_SITE = true;
 (function () {
   const CHAPTERS = [
     { key: "intro", label: "Introduction" },
-    { key: "atmosphere", file: "rainfall.json", label: "Hong Kong", kicker: "Climate Pulse · Atmosphere", name: "Hong Kong rainfall", issues: [3, 4] },
-    { key: "rivers", file: "river.json", label: "The Rhine and the Alps", kicker: "Climate Pulse · Rivers", name: "Rhine and alpine rivers", issues: [6] },
-    { key: "laire", file: "hwi.json", label: "L'Aire, Geneva", kicker: "Human-Water Interface (HWI)", name: "L'Aire, Geneva", issues: [4, 5],
+    { key: "atmosphere", file: "rainfall.json", label: "Hong Kong", kicker: "Climate Pulse · Atmosphere", name: "Hong Kong rainfall", issues: [3, 4, 7] },
+    { key: "rivers", file: "river.json", label: "The Rhine and the Alps", kicker: "Climate Pulse · Rivers", name: "Rhine and alpine rivers", issues: [6, 7] },
+    { key: "laire", file: "hwi.json", label: "L'Aire, Geneva", kicker: "Human-Water Interface (HWI)", name: "L'Aire, Geneva", issues: [4, 5, 7],
       missing: "L'Aire, Geneva uses validated data from the Office cantonal de l'eau (OCEau). It will appear here once it is released." },
   ];
   const CDN = "https://cdn.prod.website-files.com/63750b34ad85c65beae727c6/";
@@ -24,6 +24,8 @@ window.NOEA_SITE = true;
       text: "The XR prototype of Noéa, its debut at the Zurich AI Festival, the WMO collaboration, and the ethics of empathy and technology." },
     { n: 6, title: "River Anatomy", cover: "69eb3cda90e18b66b3b7be96_issue%206.jpg", pdf: "69eb3ce1dca9f12ea6ba2847_Issue%206.pdf",
       text: "Built around the Rhine: 70 years of discharge records, a four-station profile, and four frameworks that read a river as a continuous body." },
+    { n: 7, title: "Technical Guide, Phase II", cover: "6aeaa096771e6da2f6dbf636_issue%207-p-800.jpg", pdf: "6aea9ef654d0d7b1aabfbdca_issue%207.pdf",
+      text: "The code behind Noéa: its two layers, the yearly and moving-window models of Climate Pulse, and the Human-Water Interface pipeline, with what works and what is still open." },
   ];
   const LINKS = [
     ["Repository", "https://github.com/qintheory/noea", "The code behind the three prototypes, and the technical introduction."],
@@ -128,7 +130,7 @@ window.NOEA_SITE = true;
     } else body.innerHTML = '<div class="panel"><ul class="linklist">' + LINKS.map(l => '<li><a href="' + l[1] + '" target="_blank" rel="noopener">' + esc(l[0]) + ' ↗</a><span>' + esc(l[2]) + '</span></li>').join("") +
       '<li><a href="introduction.html" target="_blank" rel="noopener">Technical introduction ↗</a><span>The deck that explains the method, in its own page (arrow keys to move, N for notes).</span></li></ul>' +
       '<p class="credits">Data: Hong Kong Observatory (rainfall, 1884–2025); Global Runoff Data Centre and the Swiss Federal Office for the Environment (rivers); Office cantonal de l\'eau, Geneva (the L\'Aire gauges). ' +
-      'Method: an unsupervised model (PCA reconstruction error) learns what a typical year or day looks like for each record and scores how unusual each one is. No part of this has been tested with viewers yet.</p></div>';
+      'Method: an unsupervised model (PCA) learns what a typical year, stretch or day looks like for each record and scores how unusual each one is; Climate Pulse also reads each record in moving windows. No part of this has been tested with viewers yet.</p></div>';
   }
   function renderVideos(play) {
     if (!vid) vid = (VIDEOS.find(v => v.chapters.includes(current.key)) || VIDEOS[0]).id;
