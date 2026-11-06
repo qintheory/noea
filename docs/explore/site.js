@@ -24,7 +24,7 @@ window.NOEA_SITE = true;
       text: "The XR prototype of Noéa, its debut at the Zurich AI Festival, the WMO collaboration, and the ethics of empathy and technology." },
     { n: 6, title: "River Anatomy", cover: "69eb3cda90e18b66b3b7be96_issue%206.jpg", pdf: "69eb3ce1dca9f12ea6ba2847_Issue%206.pdf",
       text: "Built around the Rhine: 70 years of discharge records, a four-station profile, and four frameworks that read a river as a continuous body." },
-    { n: 7, title: "Technical Guide, Phase II", cover: "6aeaa096771e6da2f6dbf636_issue%207-p-800.jpg", pdf: "6aea9ef654d0d7b1aabfbdca_issue%207.pdf",
+    { n: 7, title: "Technical Guide", cover: "6aeaa096771e6da2f6dbf636_issue%207-p-800.jpg", pdf: "6aea9ef654d0d7b1aabfbdca_issue%207.pdf",
       text: "The code behind Noéa: its two layers, the yearly and moving-window models of Climate Pulse, and the Human-Water Interface pipeline, with what works and what is still open." },
   ];
   const LINKS = [

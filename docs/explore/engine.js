@@ -837,6 +837,19 @@ function mwBoot() {
     const i = G.labels.indexOf(new Date(hit.t).getUTCFullYear()); if (i >= 0) select(i); });
 }
 
+/* ---------- the technical view: the animation is for everyone, the analysis behind it folds away (Hong Kong and the rivers) ---------- */
+function setTech(open) {
+  const body = $("techBody"), btn = $("techToggle"); body.hidden = !open; btn.setAttribute("aria-expanded", String(open));
+  btn.textContent = open ? "Hide the technical view" : "Technical view: the analysis behind the animation";
+  try { localStorage.setItem("noea-tech", open ? "1" : "0"); } catch (e) { /* storage may be blocked */ }
+  if (open && P && st) requestAnimationFrame(() => { sizeCanvas(); setStep(st.step); window.dispatchEvent(new Event("resize")); });
+}
+function techMount() {
+  const fold = P.kind !== "day", wanted = /[?&]technical\b/.test(location.search) || (() => { try { return localStorage.getItem("noea-tech") === "1"; } catch (e) { return false; } })();
+  $("techBar").hidden = !fold; $("techToggle").onclick = () => setTech($("techBody").hidden);
+  if (fold) setTech(wanted); else { $("techBody").hidden = false; }
+}
+
 function start(data) {
   P = data; prepare();
   st = { g: 0, step: 0, f: 0, sel: 0, win: 0, fg: 0, hover: null, hoverG: null, bhoverG: null, view: (P.views || [["line"]])[0][0] };
@@ -868,7 +881,7 @@ function start(data) {
     document.querySelectorAll("#views .chip").forEach(b => b.onclick = () => setView(b.dataset.v)); }
   $("bodyPlay").onclick = playBody; $("bodyRange").oninput = (e) => { stopBody(); setBodyYear(+e.target.value); };
   sizeCanvas();
-  setGroup(0);
+  setGroup(0); techMount();
 }
 function boot() {
   if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", () => { if (P && $("main").clientWidth) { drawMain(); drawDetail(); } });
